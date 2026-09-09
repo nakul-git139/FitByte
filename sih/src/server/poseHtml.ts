@@ -50,6 +50,8 @@ export const POSE_DETECTOR_HTML = `<!DOCTYPE html>
     let animFrameId = null;
     let isProcessing = false;
     let smoothedLandmarks = null;
+    let errorJointsSet = new Set();
+    let isGoodFormState = true;
 
     function resize() {
       canvas.width = window.innerWidth;
@@ -117,7 +119,7 @@ export const POSE_DETECTOR_HTML = `<!DOCTYPE html>
     }
 
     const pose = new Pose({
-      locateFile: (file) => \`https://cdn.jsdelivr.net/npm/@mediapipe/pose/\${file}\`
+      locateFile: (file) => 'https://cdn.jsdelivr.net/npm/@mediapipe/pose/' + file
     });
 
     pose.setOptions({
@@ -141,6 +143,7 @@ export const POSE_DETECTOR_HTML = `<!DOCTYPE html>
           for (let i = 0; i < rawLm.length; i++) {
             smoothedLandmarks[i].x = smoothedLandmarks[i].x * 0.35 + rawLm[i].x * 0.65;
             smoothedLandmarks[i].y = smoothedLandmarks[i].y * 0.35 + rawLm[i].y * 0.65;
+            smoothedLandmarks[i].z = (smoothedLandmarks[i].z || 0) * 0.35 + (rawLm[i].z || 0) * 0.65;
             smoothedLandmarks[i].visibility = rawLm[i].visibility;
           }
         }
@@ -157,7 +160,7 @@ export const POSE_DETECTOR_HTML = `<!DOCTYPE html>
 
         // 1. Draw Skeleton Lines
         ctx.lineWidth = 4;
-        ctx.strokeStyle = '#10B981';
+        ctx.strokeStyle = isGoodFormState ? '#10B981' : 'rgba(245, 158, 11, 0.9)';
         ctx.lineCap = 'round';
 
         POSE_CONNECTIONS.forEach(([start, end]) => {
@@ -167,9 +170,12 @@ export const POSE_DETECTOR_HTML = `<!DOCTYPE html>
           const p2 = lm[end];
 
           if (isPointInView(p1) && isPointInView(p2)) {
+            const hasError = errorJointsSet.has(start) || errorJointsSet.has(end);
             ctx.beginPath();
             ctx.moveTo(toScreenX(p1.x), toScreenY(p1.y));
             ctx.lineTo(toScreenX(p2.x), toScreenY(p2.y));
+            ctx.strokeStyle = hasError ? '#EF4444' : (isGoodFormState ? '#10B981' : '#F59E0B');
+            ctx.lineWidth = hasError ? 5 : 4;
             ctx.stroke();
           }
         });
@@ -182,17 +188,20 @@ export const POSE_DETECTOR_HTML = `<!DOCTYPE html>
             visiblePoints++;
             const x = toScreenX(pt.x);
             const y = toScreenY(pt.y);
+            const isErrorJoint = errorJointsSet.has(idx);
 
             // Outer glow
             ctx.beginPath();
-            ctx.arc(x, y, 9, 0, 2 * Math.PI);
-            ctx.fillStyle = 'rgba(16, 185, 129, 0.45)';
+            ctx.arc(x, y, isErrorJoint ? 14 : 9, 0, 2 * Math.PI);
+            ctx.fillStyle = isErrorJoint
+              ? 'rgba(239, 68, 68, 0.65)'
+              : (isGoodFormState ? 'rgba(16, 185, 129, 0.45)' : 'rgba(245, 158, 11, 0.45)');
             ctx.fill();
 
             // Inner core
             ctx.beginPath();
-            ctx.arc(x, y, 5, 0, 2 * Math.PI);
-            ctx.fillStyle = (idx === 0) ? '#EF4444' : '#38BDF8';
+            ctx.arc(x, y, isErrorJoint ? 6 : 5, 0, 2 * Math.PI);
+            ctx.fillStyle = isErrorJoint ? '#EF4444' : ((idx === 0) ? '#EF4444' : '#38BDF8');
             ctx.fill();
             ctx.strokeStyle = '#FFFFFF';
             ctx.lineWidth = 2;
@@ -215,7 +224,7 @@ export const POSE_DETECTOR_HTML = `<!DOCTYPE html>
           elbowAngle = leftElbow > 0 ? leftElbow : rightElbow;
         }
 
-        // Send data to React Native
+        // Send full landmark data to React Native Local Engine
         if (window.ReactNativeWebView) {
           window.ReactNativeWebView.postMessage(JSON.stringify({
             type: 'POSE_DATA',
@@ -224,10 +233,10 @@ export const POSE_DETECTOR_HTML = `<!DOCTYPE html>
             elbowAngle: elbowAngle,
             facing: currentFacing === 'user' ? 'front' : 'back',
             landmarks: lm.map(p => ({
-              x: p.x,
-              y: p.y,
-              z: p.z || 0,
-              visibility: isPointInView(p) ? 1 : 0
+              x: parseFloat(p.x.toFixed(4)),
+              y: parseFloat(p.y.toFixed(4)),
+              z: parseFloat((p.z || 0).toFixed(4)),
+              visibility: isPointInView(p) ? (p.visibility ?? 1) : 0
             }))
           }));
         }
@@ -395,7 +404,7 @@ export const POSE_DETECTOR_HTML = `<!DOCTYPE html>
 
       video.pause();
       video.removeAttribute('src');
-      video.load(); // Forces WebKit/Chromium to immediately release native hardware buffers!
+      video.load();
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       smoothedLandmarks = null;
 
@@ -403,7 +412,7 @@ export const POSE_DETECTOR_HTML = `<!DOCTYPE html>
       video.className = requestedBack ? 'unmirrored' : 'mirrored';
       canvas.className = requestedBack ? 'unmirrored' : 'mirrored';
 
-      // 3. Sensor cooldown delay for Android Camera HAL / iOS AVCapture hardware release
+      // 3. Sensor cooldown delay
       await new Promise(r => setTimeout(r, 400));
 
       // 4. Start requested physical camera
@@ -411,7 +420,6 @@ export const POSE_DETECTOR_HTML = `<!DOCTYPE html>
       isSwitching = false;
     }
 
-    // Globally exposed function callable directly from React Native injectJavaScript
     window.switchCameraTo = function(facingMode) {
       const target = (facingMode === 'back' || facingMode === 'rear' || facingMode === 'environment') ? 'environment' : 'user';
       if (target !== currentFacing) {
@@ -419,14 +427,22 @@ export const POSE_DETECTOR_HTML = `<!DOCTYPE html>
       }
     };
 
-    // Handle camera toggle message from React Native header icon button
+    window.updateFormHighlight = function(jointsArray, isGood) {
+      errorJointsSet = new Set(Array.isArray(jointsArray) ? jointsArray : []);
+      isGoodFormState = isGood !== false;
+    };
+
     function onMessageFromRN(event) {
       try {
         const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
-        if (data && data.action === 'SWITCH_CAMERA') {
-          const target = (data.facing === 'back' || data.facing === 'rear') ? 'environment' : 'user';
-          if (target !== currentFacing) {
-            toggleCamera(target);
+        if (data) {
+          if (data.action === 'SWITCH_CAMERA') {
+            const target = (data.facing === 'back' || data.facing === 'rear') ? 'environment' : 'user';
+            if (target !== currentFacing) {
+              toggleCamera(target);
+            }
+          } else if (data.action === 'HIGHLIGHT_JOINTS') {
+            window.updateFormHighlight(data.joints, data.isGoodForm);
           }
         }
       } catch (e) {}

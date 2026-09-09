@@ -6,28 +6,41 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { CameraFacing, WorkoutStatus, WorkoutStats, WorkoutSummary } from '../types/workout';
 import { PoseLandmark } from '../types/pose';
+import { ExercisePhase, FormError, VisibilityStatus } from '../engine/types';
+import { ExerciseEngineRegistry, SUPPORTED_EXERCISES } from '../engine/registry';
+import { SpeechService } from '../engine/core/SpeechService';
 import { PermissionScreen } from './PermissionScreen';
 import { WorkoutHUDOverlay } from './WorkoutHUDOverlay';
 import { WorkoutControls } from './WorkoutControls';
 import { WorkoutSummaryModal } from './WorkoutSummaryModal';
 import { MediaPipePoseTracker } from './MediaPipePoseTracker';
 
-const EXERCISE_OPTIONS = ['Squats', 'Pushups', 'Jumping Jacks', 'Full Body Workout', 'Plank'];
+const EXERCISE_OPTIONS = ['Pushups', 'Squats'];
 
 export const WorkoutCameraScreen: React.FC = () => {
   const [permission, requestPermission] = useCameraPermissions();
   const [facing, setFacing] = useState<CameraFacing>('front');
   const [enableTorch, setEnableTorch] = useState<boolean>(false);
   const [showPoseSkeleton, setShowPoseSkeleton] = useState<boolean>(true);
+  const [isMuted, setIsMuted] = useState<boolean>(false);
 
   const [workoutStatus, setWorkoutStatus] = useState<WorkoutStatus>('idle');
-  const [selectedExercise, setSelectedExercise] = useState<string>('Squats');
+  const [selectedExercise, setSelectedExercise] = useState<string>('Pushups');
   const [showExercisePicker, setShowExercisePicker] = useState<boolean>(false);
 
-  // Live real-time computer vision metrics from MediaPipe
+  // Live real-time computer vision metrics from MediaPipe & Form Engine
   const [liveKneeAngle, setLiveKneeAngle] = useState<number>(0);
   const [liveElbowAngle, setLiveElbowAngle] = useState<number>(0);
+  const [liveHipAngle, setLiveHipAngle] = useState<number>(0);
+  const [liveElbowWidthRatio, setLiveElbowWidthRatio] = useState<number>(0);
   const [detectedJointCount, setDetectedJointCount] = useState<number>(0);
+  const [currentPhase, setCurrentPhase] = useState<ExercisePhase>('IDLE');
+
+  // Real-time AI Form Feedback state
+  const [primaryFeedback, setPrimaryFeedback] = useState<FormError | null>(null);
+  const [isGoodForm, setIsGoodForm] = useState<boolean>(true);
+  const [highlightJoints, setHighlightJoints] = useState<number[]>([]);
+  const [visibilityStatus, setVisibilityStatus] = useState<VisibilityStatus | undefined>(undefined);
 
   const [stats, setStats] = useState<WorkoutStats>({
     durationSeconds: 0,
@@ -44,8 +57,8 @@ export const WorkoutCameraScreen: React.FC = () => {
   const [showSummaryModal, setShowSummaryModal] = useState<boolean>(false);
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const repStateRef = useRef<'UP' | 'DOWN'>('UP');
-  const lowestAngleInCurrentRepRef = useRef<number>(180);
+  const previousRepCountRef = useRef<number>(0);
+  const previousErrorIdRef = useRef<string | null>(null);
 
   // Active workout duration timer
   useEffect(() => {
@@ -55,8 +68,7 @@ export const WorkoutCameraScreen: React.FC = () => {
           const nextDuration = prevStats.durationSeconds + 1;
           const nextActive = prevStats.activeSeconds + 1;
 
-          // Scientifically grounded METs calorie calculation
-          // (Rep work + base active movement metabolic equivalent)
+          // METs calorie calculation
           const repKcal = prevStats.repCount * (selectedExercise === 'Pushups' ? 0.48 : 0.40);
           const activeKcal = (nextActive / 60) * 4.0;
           const totalCalories = Math.round(repKcal + activeKcal);
@@ -83,6 +95,17 @@ export const WorkoutCameraScreen: React.FC = () => {
     };
   }, [workoutStatus, selectedExercise]);
 
+  // Exercise change handler
+  useEffect(() => {
+    const engine = ExerciseEngineRegistry.getEngine(selectedExercise);
+    engine.reset();
+    previousRepCountRef.current = 0;
+    previousErrorIdRef.current = null;
+    setPrimaryFeedback(null);
+    setIsGoodForm(true);
+    setHighlightJoints([]);
+  }, [selectedExercise]);
+
   // Tactile haptics helper
   const triggerHaptic = (type: 'light' | 'medium' | 'heavy' | 'notification') => {
     try {
@@ -95,7 +118,7 @@ export const WorkoutCameraScreen: React.FC = () => {
     }
   };
 
-  // Handle Real-Time Computer Vision Data from MediaPipe AI
+  // Handle Real-Time Computer Vision Data from MediaPipe AI & Local Form Analysis Engine
   const handlePoseData = (data: {
     jointCount: number;
     kneeAngle: number;
@@ -106,86 +129,59 @@ export const WorkoutCameraScreen: React.FC = () => {
     setLiveKneeAngle(data.kneeAngle);
     setLiveElbowAngle(data.elbowAngle);
 
-    // Only track reps when workout is active and real joints are detected
-    if (workoutStatus === 'active') {
-      if (selectedExercise === 'Squats' && data.kneeAngle > 0) {
-        // Track lowest angle during this rep to rate depth/form
-        if (repStateRef.current === 'DOWN') {
-          if (data.kneeAngle < lowestAngleInCurrentRepRef.current) {
-            lowestAngleInCurrentRepRef.current = data.kneeAngle;
-          }
+    // Get active deterministic form engine for the selected exercise
+    const engine = ExerciseEngineRegistry.getEngine(selectedExercise);
+
+    if (workoutStatus === 'active' || workoutStatus === 'idle') {
+      const result = engine.processFrame(data.landmarks, Date.now());
+
+      setCurrentPhase(result.phase);
+      setPrimaryFeedback(result.primaryFeedback);
+      setIsGoodForm(result.isGoodForm);
+      setHighlightJoints(result.highlightJoints);
+      setVisibilityStatus(result.visibilityStatus);
+
+      if (result.metrics.hipAngle !== undefined) {
+        setLiveHipAngle(result.metrics.hipAngle);
+      }
+      if (result.metrics.elbowWidthRatio !== undefined) {
+        setLiveElbowWidthRatio(result.metrics.elbowWidthRatio);
+      }
+
+      // If workout is active, track reps and scores
+      if (workoutStatus === 'active') {
+        // Check for newly completed repetition
+        if (result.repCount > previousRepCountRef.current) {
+          const isNewPerfect = result.perfectReps > stats.perfectReps;
+          triggerHaptic(isNewPerfect ? 'notification' : 'medium');
+          previousRepCountRef.current = result.repCount;
         }
 
-        // 1. Squat descent into inflection zone (< 115 degrees)
-        if (data.kneeAngle < 115 && repStateRef.current === 'UP') {
-          repStateRef.current = 'DOWN';
-          lowestAngleInCurrentRepRef.current = data.kneeAngle;
+        // Check for newly triggered form correction
+        if (result.primaryFeedback && result.primaryFeedback.ruleId !== previousErrorIdRef.current) {
           triggerHaptic('light');
+          previousErrorIdRef.current = result.primaryFeedback.ruleId;
+        } else if (!result.primaryFeedback) {
+          previousErrorIdRef.current = null;
         }
 
-        // 2. Return to standing extension (> 155 degrees) completes the rep!
-        if (data.kneeAngle > 155 && repStateRef.current === 'DOWN') {
-          repStateRef.current = 'UP';
-          const isDeepRep = lowestAngleInCurrentRepRef.current <= 100;
-          triggerHaptic('medium');
+        setStats((prev) => {
+          const repKcal = result.repCount * (selectedExercise === 'Pushups' ? 0.48 : 0.40);
+          const activeKcal = (prev.activeSeconds / 60) * 4.0;
 
-          setStats((prev) => {
-            const nextReps = prev.repCount + 1;
-            const nextPerfect = isDeepRep ? prev.perfectReps + 1 : prev.perfectReps;
-            const accuracy = Math.round((nextPerfect / nextReps) * 100);
-            const repKcal = nextReps * 0.40;
-            const activeKcal = (prev.activeSeconds / 60) * 4.0;
-
-            return {
-              ...prev,
-              repCount: nextReps,
-              perfectReps: nextPerfect,
-              formAccuracyScore: accuracy,
-              caloriesBurned: Math.round(repKcal + activeKcal),
-            };
-          });
-        }
-      } else if (selectedExercise === 'Pushups' && data.elbowAngle > 0) {
-        if (repStateRef.current === 'DOWN') {
-          if (data.elbowAngle < lowestAngleInCurrentRepRef.current) {
-            lowestAngleInCurrentRepRef.current = data.elbowAngle;
-          }
-        }
-
-        // Pushup bottom descent (< 95 degrees)
-        if (data.elbowAngle < 95 && repStateRef.current === 'UP') {
-          repStateRef.current = 'DOWN';
-          lowestAngleInCurrentRepRef.current = data.elbowAngle;
-          triggerHaptic('light');
-        }
-
-        // Pushup top arm lockout (> 150 degrees)
-        if (data.elbowAngle > 150 && repStateRef.current === 'DOWN') {
-          repStateRef.current = 'UP';
-          const isDeepPushup = lowestAngleInCurrentRepRef.current <= 85;
-          triggerHaptic('medium');
-
-          setStats((prev) => {
-            const nextReps = prev.repCount + 1;
-            const nextPerfect = isDeepPushup ? prev.perfectReps + 1 : prev.perfectReps;
-            const accuracy = Math.round((nextPerfect / nextReps) * 100);
-            const repKcal = nextReps * 0.48;
-            const activeKcal = (prev.activeSeconds / 60) * 4.0;
-
-            return {
-              ...prev,
-              repCount: nextReps,
-              perfectReps: nextPerfect,
-              formAccuracyScore: accuracy,
-              caloriesBurned: Math.round(repKcal + activeKcal),
-            };
-          });
-        }
+          return {
+            ...prev,
+            repCount: result.repCount,
+            perfectReps: result.perfectReps,
+            formAccuracyScore: result.formAccuracyScore,
+            caloriesBurned: Math.round(repKcal + activeKcal),
+          };
+        });
       }
     }
   };
 
-  // Camera Facing Toggle (Front / Selfie <-> Back / Rear)
+  // Camera Facing Toggle (Front <-> Back)
   const handleToggleFacing = () => {
     triggerHaptic('light');
     setFacing((prev) => (prev === 'front' ? 'back' : 'front'));
@@ -197,6 +193,16 @@ export const WorkoutCameraScreen: React.FC = () => {
     setEnableTorch((prev) => !prev);
   };
 
+  // Mute / Unmute Voice Feedback
+  const handleToggleMute = () => {
+    triggerHaptic('light');
+    setIsMuted((prev) => {
+      const next = !prev;
+      SpeechService.setMuted(next);
+      return next;
+    });
+  };
+
   // Pose Skeleton Toggle
   const handleTogglePoseSkeleton = () => {
     triggerHaptic('light');
@@ -206,6 +212,11 @@ export const WorkoutCameraScreen: React.FC = () => {
   // Workout Controls Logic
   const handleStartWorkout = () => {
     triggerHaptic('notification');
+    const engine = ExerciseEngineRegistry.getEngine(selectedExercise);
+    engine.reset();
+    previousRepCountRef.current = 0;
+    previousErrorIdRef.current = null;
+
     setStats({
       durationSeconds: 0,
       activeSeconds: 0,
@@ -216,19 +227,21 @@ export const WorkoutCameraScreen: React.FC = () => {
       startTime: new Date(),
       endTime: null,
     });
-    repStateRef.current = 'UP';
-    lowestAngleInCurrentRepRef.current = 180;
+
     setWorkoutStatus('active');
+    SpeechService.speak(`Starting ${selectedExercise} workout.`);
   };
 
   const handlePauseWorkout = () => {
     triggerHaptic('medium');
     setWorkoutStatus('paused');
+    SpeechService.speak('Workout paused.');
   };
 
   const handleResumeWorkout = () => {
     triggerHaptic('medium');
     setWorkoutStatus('active');
+    SpeechService.speak('Resuming workout.');
   };
 
   const handleStopWorkout = () => {
@@ -249,6 +262,7 @@ export const WorkoutCameraScreen: React.FC = () => {
     setWorkoutStatus('completed');
     setSummaryData(completedSummary);
     setShowSummaryModal(true);
+    SpeechService.speak(`Workout completed. Great job! You completed ${stats.repCount} repetitions.`);
   };
 
   const handleSaveSummary = () => {
@@ -265,6 +279,11 @@ export const WorkoutCameraScreen: React.FC = () => {
 
   const resetWorkoutScreen = () => {
     setWorkoutStatus('idle');
+    const engine = ExerciseEngineRegistry.getEngine(selectedExercise);
+    engine.reset();
+    previousRepCountRef.current = 0;
+    previousErrorIdRef.current = null;
+
     setStats({
       durationSeconds: 0,
       activeSeconds: 0,
@@ -275,8 +294,9 @@ export const WorkoutCameraScreen: React.FC = () => {
       startTime: null,
       endTime: null,
     });
-    repStateRef.current = 'UP';
-    lowestAngleInCurrentRepRef.current = 180;
+    setPrimaryFeedback(null);
+    setIsGoodForm(true);
+    setHighlightJoints([]);
   };
 
   const handleSelectExercise = () => {
@@ -302,6 +322,8 @@ export const WorkoutCameraScreen: React.FC = () => {
         <MediaPipePoseTracker
           facing={facing}
           visible={showPoseSkeleton}
+          highlightJoints={highlightJoints}
+          isGoodForm={isGoodForm}
           onPoseData={handlePoseData}
           onFacingChange={(newFacing) => setFacing(newFacing)}
         />
@@ -313,24 +335,32 @@ export const WorkoutCameraScreen: React.FC = () => {
         />
       )}
 
-      {/* Head-Up Display (HUD) */}
+      {/* Head-Up Display (HUD) with Real-Time AI Form Corrections */}
       <WorkoutHUDOverlay
         status={workoutStatus}
         stats={stats}
         facing={facing}
         enableTorch={enableTorch}
+        isMuted={isMuted}
         selectedExercise={selectedExercise}
         showPoseSkeleton={showPoseSkeleton}
+        phase={currentPhase}
         kneeAngle={liveKneeAngle}
         elbowAngle={liveElbowAngle}
+        hipAngle={liveHipAngle}
+        elbowWidthRatio={liveElbowWidthRatio}
         jointCount={detectedJointCount}
+        primaryFeedback={primaryFeedback}
+        isGoodForm={isGoodForm}
+        visibilityStatus={visibilityStatus}
         onToggleFacing={handleToggleFacing}
         onToggleTorch={handleToggleTorch}
+        onToggleMute={handleToggleMute}
         onSelectExercise={handleSelectExercise}
         onTogglePoseSkeleton={handleTogglePoseSkeleton}
       />
 
-      {/* Workout Action Buttons (Start / Stop Workout) */}
+      {/* Workout Action Buttons (Start / Pause / Stop Workout) */}
       <View style={styles.bottomControlsWrapper} pointerEvents="box-none">
         <WorkoutControls
           status={workoutStatus}
@@ -377,14 +407,21 @@ export const WorkoutCameraScreen: React.FC = () => {
                   setShowExercisePicker(false);
                 }}
               >
-                <Text
-                  style={[
-                    styles.exerciseOptionText,
-                    selectedExercise === item && styles.selectedExerciseOptionText,
-                  ]}
-                >
-                  {item}
-                </Text>
+                <View style={styles.exerciseOptionLeft}>
+                  <Ionicons
+                    name={item === 'Pushups' ? 'barbell-outline' : 'body-outline'}
+                    size={22}
+                    color={selectedExercise === item ? '#10B981' : '#94A3B8'}
+                  />
+                  <Text
+                    style={[
+                      styles.exerciseOptionText,
+                      selectedExercise === item && styles.selectedExerciseOptionText,
+                    ]}
+                  >
+                    {item}
+                  </Text>
+                </View>
                 {selectedExercise === item && (
                   <Ionicons name="checkmark-circle" size={20} color="#10B981" />
                 )}
@@ -430,7 +467,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 24,
-    gap: 10,
+    gap: 12,
     borderTopWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
   },
@@ -438,7 +475,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   sheetTitle: {
     color: '#F8FAFC',
@@ -450,19 +487,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: '#0F172A',
-    paddingVertical: 14,
+    paddingVertical: 16,
     paddingHorizontal: 18,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: 'transparent',
   },
+  exerciseOptionLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
   selectedExerciseOption: {
     borderColor: '#10B981',
-    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
   },
   exerciseOptionText: {
     color: '#CBD5E1',
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '600',
   },
   selectedExerciseOptionText: {

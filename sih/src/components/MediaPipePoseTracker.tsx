@@ -8,6 +8,8 @@ import { POSE_DETECTOR_HTML } from '../server/poseHtml';
 interface MediaPipePoseTrackerProps {
   facing: CameraFacing;
   visible: boolean;
+  highlightJoints?: number[];
+  isGoodForm?: boolean;
   onPoseData?: (data: {
     jointCount: number;
     kneeAngle: number;
@@ -21,6 +23,8 @@ interface MediaPipePoseTrackerProps {
 export const MediaPipePoseTracker: React.FC<MediaPipePoseTrackerProps> = ({
   facing,
   visible,
+  highlightJoints = [],
+  isGoodForm = true,
   onPoseData,
   onFacingChange,
 }) => {
@@ -38,6 +42,21 @@ export const MediaPipePoseTracker: React.FC<MediaPipePoseTrackerProps> = ({
       );
     }
   }, [facing]);
+
+  // Sync error joint highlights and form quality state to WebView canvas
+  useEffect(() => {
+    if (webViewRef.current && !loading) {
+      const msg = JSON.stringify({
+        action: 'HIGHLIGHT_JOINTS',
+        joints: highlightJoints,
+        isGoodForm: isGoodForm,
+      });
+      webViewRef.current.postMessage(msg);
+      webViewRef.current.injectJavaScript(
+        `if (window.updateFormHighlight) { window.updateFormHighlight(${JSON.stringify(highlightJoints)}, ${isGoodForm}); } true;`
+      );
+    }
+  }, [highlightJoints, isGoodForm, loading]);
 
   if (!visible) return null;
 
@@ -64,7 +83,7 @@ export const MediaPipePoseTracker: React.FC<MediaPipePoseTrackerProps> = ({
         }}
         onError={(syntheticEvent) => {
           const { nativeEvent } = syntheticEvent;
-          setError(nativeEvent.description || 'Failed to connect to Pose AI server');
+          setError(nativeEvent.description || 'Failed to initialize MediaPipe Pose AI');
           setLoading(false);
         }}
         onMessage={(event) => {
@@ -92,7 +111,7 @@ export const MediaPipePoseTracker: React.FC<MediaPipePoseTrackerProps> = ({
       {loading && (
         <View style={styles.loadingOverlay}>
           <ActivityIndicator size="large" color="#10B981" />
-          <Text style={styles.loadingText}>Connecting Real-Time MediaPipe AI...</Text>
+          <Text style={styles.loadingText}>Initializing On-Device MediaPipe AI...</Text>
         </View>
       )}
 
@@ -123,7 +142,7 @@ const styles = StyleSheet.create({
   },
   loadingOverlay: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(15, 23, 42, 0.9)',
+    backgroundColor: 'rgba(15, 23, 42, 0.92)',
     justifyContent: 'center',
     alignItems: 'center',
     gap: 14,
