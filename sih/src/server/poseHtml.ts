@@ -1,0 +1,444 @@
+export const POSE_DETECTOR_HTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Real-Time MediaPipe Pose Tracker</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { width: 100vw; height: 100vh; overflow: hidden; background: #0F172A; }
+    #container { position: relative; width: 100vw; height: 100vh; overflow: hidden; }
+    video {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      object-fit: cover;
+    }
+    canvas {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+    }
+    .mirrored {
+      transform: scaleX(-1);
+      -webkit-transform: scaleX(-1);
+    }
+    .unmirrored {
+      transform: none;
+      -webkit-transform: none;
+    }
+  </style>
+
+  <!-- MediaPipe Pose -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+</head>
+<body>
+  <div id="container">
+    <video id="webcam" class="mirrored" playsinline autoplay muted></video>
+    <canvas id="output_canvas" class="mirrored"></canvas>
+  </div>
+
+  <script>
+    const video = document.getElementById('webcam');
+    const canvas = document.getElementById('output_canvas');
+    const ctx = canvas.getContext('2d');
+
+    let currentFacing = 'user'; // 'user' (front) or 'environment' (back)
+    let isSwitching = false;
+    let currentStream = null;
+    let animFrameId = null;
+    let isProcessing = false;
+    let smoothedLandmarks = null;
+
+    function resize() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    function getRenderedVideoDimensions() {
+      const containerWidth = canvas.width || window.innerWidth;
+      const containerHeight = canvas.height || window.innerHeight;
+      const vWidth = video.videoWidth || 1280;
+      const vHeight = video.videoHeight || 720;
+
+      const containerRatio = containerWidth / containerHeight;
+      const videoRatio = vWidth / vHeight;
+
+      let renderWidth, renderHeight, offsetX, offsetY;
+
+      if (containerRatio > videoRatio) {
+        renderWidth = containerWidth;
+        renderHeight = containerWidth / videoRatio;
+        offsetX = 0;
+        offsetY = (containerHeight - renderHeight) / 2;
+      } else {
+        renderHeight = containerHeight;
+        renderWidth = containerHeight * videoRatio;
+        offsetX = (containerWidth - renderWidth) / 2;
+        offsetY = 0;
+      }
+
+      return { renderWidth, renderHeight, offsetX, offsetY };
+    }
+
+    // 33 MediaPipe Skeleton Connections
+    const POSE_CONNECTIONS = [
+      // Torso
+      [11, 12], [11, 23], [12, 24], [23, 24],
+      // Arms
+      [11, 13], [13, 15],
+      [12, 14], [14, 16],
+      // Legs
+      [23, 25], [25, 27], [27, 29], [29, 31],
+      [24, 26], [26, 28], [28, 30], [30, 32],
+      // Face
+      [0, 1], [1, 2], [2, 3], [3, 7],
+      [0, 4], [4, 5], [5, 6], [6, 8]
+    ];
+
+    function isPointInView(p) {
+      if (!p) return false;
+      const vis = (p.visibility !== undefined) ? p.visibility : 1.0;
+      return p.x >= 0.01 && p.x <= 0.99 && p.y >= 0.01 && p.y <= 0.99 && vis > 0.25;
+    }
+
+    function getJointAngle(a, b, c) {
+      if (!isPointInView(a) || !isPointInView(b) || !isPointInView(c)) {
+        return 0;
+      }
+
+      const rad = Math.atan2(c.y - b.y, c.x - b.x) - Math.atan2(a.y - b.y, a.x - b.x);
+      let deg = Math.abs(rad * (180.0 / Math.PI));
+      if (deg > 180.0) deg = 360.0 - deg;
+      return Math.round(deg);
+    }
+
+    const pose = new Pose({
+      locateFile: (file) => \`https://cdn.jsdelivr.net/npm/@mediapipe/pose/\${file}\`
+    });
+
+    pose.setOptions({
+      modelComplexity: 0,
+      smoothLandmarks: true,
+      enableSegmentation: false,
+      minDetectionConfidence: 0.5,
+      minTrackingConfidence: 0.5
+    });
+
+    pose.onResults((results) => {
+      isProcessing = false;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      if (results.poseLandmarks && results.poseLandmarks.length > 0) {
+        const rawLm = results.poseLandmarks;
+
+        if (!smoothedLandmarks || smoothedLandmarks.length !== rawLm.length) {
+          smoothedLandmarks = rawLm.map(p => ({ ...p }));
+        } else {
+          for (let i = 0; i < rawLm.length; i++) {
+            smoothedLandmarks[i].x = smoothedLandmarks[i].x * 0.35 + rawLm[i].x * 0.65;
+            smoothedLandmarks[i].y = smoothedLandmarks[i].y * 0.35 + rawLm[i].y * 0.65;
+            smoothedLandmarks[i].visibility = rawLm[i].visibility;
+          }
+        }
+
+        const lm = smoothedLandmarks;
+        const hipsVisible = isPointInView(lm[23]) || isPointInView(lm[24]);
+        const shouldersVisible = isPointInView(lm[11]) || isPointInView(lm[12]);
+
+        const { renderWidth, renderHeight, offsetX, offsetY } = getRenderedVideoDimensions();
+        const toScreenX = (normX) => offsetX + normX * renderWidth;
+        const toScreenY = (normY) => offsetY + normY * renderHeight;
+
+        let visiblePoints = 0;
+
+        // 1. Draw Skeleton Lines
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = '#10B981';
+        ctx.lineCap = 'round';
+
+        POSE_CONNECTIONS.forEach(([start, end]) => {
+          if ((start >= 23 || end >= 23) && !hipsVisible) return;
+
+          const p1 = lm[start];
+          const p2 = lm[end];
+
+          if (isPointInView(p1) && isPointInView(p2)) {
+            ctx.beginPath();
+            ctx.moveTo(toScreenX(p1.x), toScreenY(p1.y));
+            ctx.lineTo(toScreenX(p2.x), toScreenY(p2.y));
+            ctx.stroke();
+          }
+        });
+
+        // 2. Draw Glowing Joint Markers
+        lm.forEach((pt, idx) => {
+          if (idx >= 23 && !hipsVisible) return;
+
+          if (isPointInView(pt)) {
+            visiblePoints++;
+            const x = toScreenX(pt.x);
+            const y = toScreenY(pt.y);
+
+            // Outer glow
+            ctx.beginPath();
+            ctx.arc(x, y, 9, 0, 2 * Math.PI);
+            ctx.fillStyle = 'rgba(16, 185, 129, 0.45)';
+            ctx.fill();
+
+            // Inner core
+            ctx.beginPath();
+            ctx.arc(x, y, 5, 0, 2 * Math.PI);
+            ctx.fillStyle = (idx === 0) ? '#EF4444' : '#38BDF8';
+            ctx.fill();
+            ctx.strokeStyle = '#FFFFFF';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+          }
+        });
+
+        // Calculate accurate angles
+        let kneeAngle = 0;
+        if (hipsVisible) {
+          const leftKnee = getJointAngle(lm[23], lm[25], lm[27]);
+          const rightKnee = getJointAngle(lm[24], lm[26], lm[28]);
+          kneeAngle = leftKnee > 0 ? leftKnee : rightKnee;
+        }
+
+        let elbowAngle = 0;
+        if (shouldersVisible) {
+          const leftElbow = getJointAngle(lm[11], lm[13], lm[15]);
+          const rightElbow = getJointAngle(lm[12], lm[14], lm[16]);
+          elbowAngle = leftElbow > 0 ? leftElbow : rightElbow;
+        }
+
+        // Send data to React Native
+        if (window.ReactNativeWebView) {
+          window.ReactNativeWebView.postMessage(JSON.stringify({
+            type: 'POSE_DATA',
+            jointCount: visiblePoints,
+            kneeAngle: kneeAngle,
+            elbowAngle: elbowAngle,
+            facing: currentFacing === 'user' ? 'front' : 'back',
+            landmarks: lm.map(p => ({
+              x: p.x,
+              y: p.y,
+              z: p.z || 0,
+              visibility: isPointInView(p) ? 1 : 0
+            }))
+          }));
+        }
+      } else {
+        if (window.ReactNativeWebView) {
+          window.ReactNativeWebView.postMessage(JSON.stringify({
+            type: 'POSE_DATA',
+            jointCount: 0,
+            kneeAngle: 0,
+            elbowAngle: 0,
+            facing: currentFacing === 'user' ? 'front' : 'back',
+            landmarks: []
+          }));
+        }
+      }
+    });
+
+    function startProcessingLoop() {
+      if (animFrameId) {
+        cancelAnimationFrame(animFrameId);
+        animFrameId = null;
+      }
+
+      function loop() {
+        if (!video.paused && !video.ended && video.readyState >= 2) {
+          if (!isProcessing) {
+            isProcessing = true;
+            pose.send({ image: video }).catch(() => {
+              isProcessing = false;
+            });
+          }
+        }
+        animFrameId = requestAnimationFrame(loop);
+      }
+
+      animFrameId = requestAnimationFrame(loop);
+    }
+
+    /**
+     * Determines whether front camera or back camera is requested with robust fallback & retry
+     */
+    async function getCameraStreamWithRetry(targetFacing, maxRetries = 2) {
+      const isBack = (targetFacing === 'environment' || targetFacing === 'back' || targetFacing === 'rear');
+      const mode = isBack ? 'environment' : 'user';
+
+      // 1. Hardware device enumeration lookup
+      let enumeratedDeviceId = null;
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter(d => d.kind === 'videoinput');
+        if (videoDevices.length > 0) {
+          let matched = null;
+          if (isBack) {
+            matched = videoDevices.find(d => {
+              const lbl = (d.label || '').toLowerCase();
+              return lbl.includes('back') || lbl.includes('rear') || lbl.includes('environment') || lbl.includes('0');
+            }) || (videoDevices.length > 1 ? videoDevices[videoDevices.length - 1] : null);
+          } else {
+            matched = videoDevices.find(d => {
+              const lbl = (d.label || '').toLowerCase();
+              return lbl.includes('front') || lbl.includes('user') || lbl.includes('selfie') || lbl.includes('face');
+            }) || videoDevices[0];
+          }
+          if (matched && matched.deviceId) {
+            enumeratedDeviceId = matched.deviceId;
+          }
+        }
+      } catch (e) {
+        console.warn("Device enumeration check skipped:", e);
+      }
+
+      const constraintList = [];
+      if (enumeratedDeviceId) {
+        constraintList.push({ video: { deviceId: { exact: enumeratedDeviceId } }, audio: false });
+      }
+      constraintList.push(
+        { video: { facingMode: { exact: mode } }, audio: false },
+        { video: { facingMode: { ideal: mode } }, audio: false },
+        { video: { facingMode: mode }, audio: false },
+        { video: true, audio: false }
+      );
+
+      for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        for (const constraint of constraintList) {
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia(constraint);
+            if (stream && stream.getVideoTracks().length > 0) {
+              return stream;
+            }
+          } catch (err) {
+            console.warn("Attempt failed for constraint:", constraint, err?.name, err?.message);
+          }
+        }
+        if (attempt < maxRetries) {
+          // Camera HAL lock cooldown
+          await new Promise(r => setTimeout(r, 350));
+        }
+      }
+
+      throw new Error("Could not acquire camera stream after retries");
+    }
+
+    async function startCamera() {
+      try {
+        const stream = await getCameraStreamWithRetry(currentFacing);
+        currentStream = stream;
+        video.srcObject = stream;
+
+        await new Promise((resolve) => {
+          video.onloadedmetadata = () => {
+            video.play().then(resolve).catch(resolve);
+          };
+          setTimeout(resolve, 800);
+        });
+
+        // Mirroring control
+        const track = stream.getVideoTracks()[0];
+        const settings = track?.getSettings ? track.getSettings() : {};
+        const trackLabel = (track?.label || '').toLowerCase();
+        const isBack = (currentFacing === 'environment' || currentFacing === 'back' || currentFacing === 'rear');
+        const isFront = (settings.facingMode === 'user') || trackLabel.includes('front') || (!isBack && !trackLabel.includes('back'));
+
+        video.className = isFront ? 'mirrored' : 'unmirrored';
+        canvas.className = isFront ? 'mirrored' : 'unmirrored';
+
+        startProcessingLoop();
+      } catch (err) {
+        console.error("Camera start failed:", err);
+      }
+    }
+
+    async function toggleCamera(targetFacing) {
+      if (isSwitching) return;
+      isSwitching = true;
+
+      const requestedBack = (targetFacing === 'environment' || targetFacing === 'back' || targetFacing === 'rear');
+      currentFacing = requestedBack ? 'environment' : 'user';
+
+      // 1. Stop processing loop
+      if (animFrameId) {
+        cancelAnimationFrame(animFrameId);
+        animFrameId = null;
+      }
+      isProcessing = false;
+
+      // 2. Shut down hardware camera tracks completely
+      if (currentStream) {
+        try {
+          currentStream.getTracks().forEach(track => {
+            track.stop();
+            track.enabled = false;
+          });
+        } catch (e) {}
+        currentStream = null;
+      }
+      if (video.srcObject) {
+        try {
+          const oldStream = video.srcObject;
+          if (oldStream && oldStream.getTracks) {
+            oldStream.getTracks().forEach(t => t.stop());
+          }
+        } catch (e) {}
+        video.srcObject = null;
+      }
+
+      video.pause();
+      video.removeAttribute('src');
+      video.load(); // Forces WebKit/Chromium to immediately release native hardware buffers!
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      smoothedLandmarks = null;
+
+      // Set mirror class immediately based on target
+      video.className = requestedBack ? 'unmirrored' : 'mirrored';
+      canvas.className = requestedBack ? 'unmirrored' : 'mirrored';
+
+      // 3. Sensor cooldown delay for Android Camera HAL / iOS AVCapture hardware release
+      await new Promise(r => setTimeout(r, 400));
+
+      // 4. Start requested physical camera
+      await startCamera();
+      isSwitching = false;
+    }
+
+    // Globally exposed function callable directly from React Native injectJavaScript
+    window.switchCameraTo = function(facingMode) {
+      const target = (facingMode === 'back' || facingMode === 'rear' || facingMode === 'environment') ? 'environment' : 'user';
+      if (target !== currentFacing) {
+        toggleCamera(target);
+      }
+    };
+
+    // Handle camera toggle message from React Native header icon button
+    function onMessageFromRN(event) {
+      try {
+        const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+        if (data && data.action === 'SWITCH_CAMERA') {
+          const target = (data.facing === 'back' || data.facing === 'rear') ? 'environment' : 'user';
+          if (target !== currentFacing) {
+            toggleCamera(target);
+          }
+        }
+      } catch (e) {}
+    }
+
+    window.addEventListener('message', onMessageFromRN);
+    document.addEventListener('message', onMessageFromRN);
+
+    window.addEventListener('load', () => {
+      startCamera();
+    });
+  </script>
+</body>
+</html>
+`;

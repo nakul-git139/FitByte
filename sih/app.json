@@ -1,0 +1,42 @@
+{
+  "expo": {
+    "name": "Fitness Workout Camera",
+    "slug": "fitness-workout-camera",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0F172A"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "Fitness Workout Camera requires access to your camera to track your workout and live movement."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0F172A"
+      },
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Fitness Workout Camera to access your camera to track workouts.",
+          "microphonePermission": "Allow Fitness Workout Camera to access your microphone.",
+          "recordAudioAndroid": false
+        }
+      ],
+      "expo-asset"
+    ]
+  }
+}
