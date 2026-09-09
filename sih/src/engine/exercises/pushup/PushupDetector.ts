@@ -83,18 +83,22 @@ export class PushupDetector {
 
       case 'ASCENDING':
         if (elbowAngle >= PUSHUP_THRESHOLDS.armLockoutMinAngle) {
-          this.phase = 'COMPLETED';
-          this.repCount++;
+          const romDelta = 180 - this.lowestAngleInCurrentRep;
+          // Guard: Minimum ROM delta of 40 degrees required to complete a rep
+          if (romDelta >= 40) {
+            this.repCount++;
 
-          const isDeepRep = this.lowestAngleInCurrentRep <= PUSHUP_THRESHOLDS.bottomInflectionAngle;
-          isPerfect = isDeepRep && !this.hadErrorsInCurrentRep;
+            const isDeepRep = this.lowestAngleInCurrentRep <= PUSHUP_THRESHOLDS.bottomInflectionAngle;
+            isPerfect = isDeepRep && !this.hadErrorsInCurrentRep;
 
-          if (isPerfect) {
-            this.perfectReps++;
+            if (isPerfect) {
+              this.perfectReps++;
+            }
+
+            isNewRep = true;
+            this.lastPhaseChangeTimestamp = timestamp;
+            this.phase = 'COMPLETED';
           }
-
-          isNewRep = true;
-          this.lastPhaseChangeTimestamp = timestamp;
 
           // Transition back to START for next rep
           this.phase = 'START';

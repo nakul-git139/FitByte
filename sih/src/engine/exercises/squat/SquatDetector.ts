@@ -75,17 +75,21 @@ export class SquatDetector {
 
       case 'ASCENDING':
         if (kneeAngle >= SQUAT_THRESHOLDS.standingMinAngle) {
-          this.phase = 'COMPLETED';
-          this.repCount++;
+          const romDelta = 180 - this.lowestAngleInCurrentRep;
+          // Guard: Minimum ROM delta of 40 degrees required to complete a rep
+          if (romDelta >= 40) {
+            this.repCount++;
 
-          const isDeepRep = this.lowestAngleInCurrentRep <= SQUAT_THRESHOLDS.deepSquatMaxAngle;
-          isPerfect = isDeepRep && !this.hadErrorsInCurrentRep;
+            const isDeepRep = this.lowestAngleInCurrentRep <= SQUAT_THRESHOLDS.deepSquatMaxAngle;
+            isPerfect = isDeepRep && !this.hadErrorsInCurrentRep;
 
-          if (isPerfect) {
-            this.perfectReps++;
+            if (isPerfect) {
+              this.perfectReps++;
+            }
+
+            isNewRep = true;
+            this.phase = 'COMPLETED';
           }
-
-          isNewRep = true;
 
           // Ready for next rep
           this.phase = 'START';

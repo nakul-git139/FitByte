@@ -59,6 +59,9 @@ export interface ExerciseAnalysisResult {
   phase: ExercisePhase;
   repCount: number;
   perfectReps: number;
+  goodReps?: number;
+  badReps?: number;
+  targetReps?: number;
   formAccuracyScore: number;
   activeErrors: FormError[];
   primaryFeedback: FormError | null;

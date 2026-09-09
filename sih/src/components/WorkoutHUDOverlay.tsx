@@ -11,6 +11,7 @@ interface WorkoutHUDOverlayProps {
   isMuted: boolean;
   selectedExercise: string;
   showPoseSkeleton: boolean;
+  targetReps?: number;
   phase?: ExercisePhase;
   kneeAngle?: number;
   elbowAngle?: number;
@@ -20,12 +21,18 @@ interface WorkoutHUDOverlayProps {
   primaryAngle?: number;
   jointCount?: number;
   primaryFeedback?: FormError | null;
+  geminiCoachingTip?: {
+    text: string;
+    assessment: 'good' | 'needs_improvement';
+    confidence: number;
+  } | null;
   isGoodForm?: boolean;
   visibilityStatus?: VisibilityStatus;
   onToggleFacing: () => void;
   onToggleMute: () => void;
   onSelectExercise: () => void;
   onTogglePoseSkeleton: () => void;
+  onExit?: () => void;
 }
 
 export const WorkoutHUDOverlay: React.FC<WorkoutHUDOverlayProps> = ({
@@ -35,6 +42,7 @@ export const WorkoutHUDOverlay: React.FC<WorkoutHUDOverlayProps> = ({
   isMuted,
   selectedExercise,
   showPoseSkeleton,
+  targetReps,
   phase = 'IDLE',
   kneeAngle = 0,
   elbowAngle = 0,
@@ -44,12 +52,14 @@ export const WorkoutHUDOverlay: React.FC<WorkoutHUDOverlayProps> = ({
   primaryAngle = 0,
   jointCount = 0,
   primaryFeedback = null,
+  geminiCoachingTip = null,
   isGoodForm = true,
   visibilityStatus,
   onToggleFacing,
   onToggleMute,
   onSelectExercise,
   onTogglePoseSkeleton,
+  onExit,
 }) => {
   const formatTime = (totalSeconds: number): string => {
     const hours = Math.floor(totalSeconds / 3600);
@@ -105,20 +115,33 @@ export const WorkoutHUDOverlay: React.FC<WorkoutHUDOverlayProps> = ({
     <View style={styles.overlayContainer} pointerEvents="box-none">
       {/* 1. TOP HEADER NAVIGATION BAR */}
       <View style={styles.headerBar}>
-        {/* Left: Exercise Selector Pill */}
-        <TouchableOpacity
-          style={styles.exerciseBadge}
-          onPress={onSelectExercise}
-          activeOpacity={0.8}
-        >
-          <Ionicons
-            name={selectedExercise === 'Pushups' ? 'barbell' : 'body'}
-            size={18}
-            color="#10B981"
-          />
-          <Text style={styles.exerciseBadgeText}>{selectedExercise}</Text>
-          <Ionicons name="chevron-down" size={14} color="#94A3B8" />
-        </TouchableOpacity>
+        {/* Left: Back (if onExit provided) & Exercise Selector Pill */}
+        <View style={styles.headerLeftGroup}>
+          {onExit && (
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={onExit}
+              activeOpacity={0.7}
+              accessibilityLabel="Back to Workout Summary"
+            >
+              <Ionicons name="arrow-back" size={18} color="#CBD5E1" />
+            </TouchableOpacity>
+          )}
+
+          <TouchableOpacity
+            style={styles.exerciseBadge}
+            onPress={onSelectExercise}
+            activeOpacity={0.8}
+          >
+            <Ionicons
+              name={selectedExercise === 'Pushups' ? 'barbell' : 'body'}
+              size={18}
+              color="#10B981"
+            />
+            <Text style={styles.exerciseBadgeText}>{selectedExercise}</Text>
+            <Ionicons name="chevron-down" size={14} color="#94A3B8" />
+          </TouchableOpacity>
+        </View>
 
         {/* Right: Quick Action Controls Cluster */}
         <View style={styles.quickActionsGroup}>
@@ -209,6 +232,28 @@ export const WorkoutHUDOverlay: React.FC<WorkoutHUDOverlayProps> = ({
           </Text>
         </View>
       </View>
+
+      {/* 2b. GEMINI VISION AI COACH INSIGHT PILL (Asynchronous Keyframe Feedback) */}
+      {geminiCoachingTip && geminiCoachingTip.text && (
+        <View style={styles.geminiVisionPillWrapper} pointerEvents="box-none">
+          <View
+            style={[
+              styles.geminiVisionPill,
+              geminiCoachingTip.assessment === 'needs_improvement'
+                ? styles.geminiVisionWarning
+                : styles.geminiVisionGood,
+            ]}
+          >
+            <View style={styles.geminiBadge}>
+              <Ionicons name="sparkles" size={11} color="#38BDF8" />
+              <Text style={styles.geminiBadgeText}>GEMINI VISION</Text>
+            </View>
+            <Text style={styles.geminiVisionText} numberOfLines={2}>
+              {geminiCoachingTip.text}
+            </Text>
+          </View>
+        </View>
+      )}
 
       {/* 3. HERO REP COUNTER & TELEMETRY ROW */}
       <View style={styles.heroTelemetryRow} pointerEvents="box-none">
@@ -451,22 +496,47 @@ export const WorkoutHUDOverlay: React.FC<WorkoutHUDOverlayProps> = ({
         )}
 
         {/* Right Card: HERO REP COUNTER WIDGET (Prominently visible) */}
-        <View style={styles.heroRepWidget}>
-          <Text style={styles.heroRepLabel}>
-            {selectedExercise === 'Plank' ? 'HOLD TIME' : 'REPETITIONS'}
-          </Text>
-          <View style={styles.heroRepNumberRow}>
-            <Text style={styles.heroRepNumber}>{stats.repCount}</Text>
-            <Text style={styles.heroRepUnit}>
-              {selectedExercise === 'Plank' ? 'SEC' : 'REPS'}
-            </Text>
-          </View>
+        {(() => {
+          const goodReps = stats.perfectReps ?? stats.goodReps ?? 0;
+          const badReps = stats.badReps ?? Math.max(0, stats.repCount - goodReps);
+          const target = targetReps || stats.targetReps || (selectedExercise === 'Plank' ? 30 : 12);
+          const formScore = stats.formAccuracyScore ?? 100;
+          const isIsometric = selectedExercise === 'Plank';
 
-          <View style={styles.heroRepScoreBadge}>
-            <Ionicons name="sparkles" size={12} color="#10B981" />
-            <Text style={styles.heroRepScoreText}>{stats.formAccuracyScore}% ACCURACY</Text>
-          </View>
-        </View>
+          return (
+            <View style={styles.heroRepWidget}>
+              <Text style={styles.heroRepLabel}>
+                {isIsometric ? 'HOLD TIME' : 'REPS'}
+              </Text>
+              
+              <View style={styles.heroRepNumberRow}>
+                <Text style={styles.heroRepNumber}>{stats.repCount}</Text>
+                <Text style={styles.heroRepTargetDivider}>/</Text>
+                <Text style={styles.heroRepTargetNumber}>
+                  {target}{isIsometric ? 's' : ''}
+                </Text>
+              </View>
+
+              {/* Good & Bad Rep Breakdown Badges */}
+              <View style={styles.heroRepStatsRow}>
+                <View style={styles.goodRepPill}>
+                  <Ionicons name="checkmark-circle" size={11} color="#10B981" />
+                  <Text style={styles.goodRepText}>Good: {goodReps}</Text>
+                </View>
+                <View style={styles.badRepPill}>
+                  <Ionicons name="close-circle" size={11} color="#EF4444" />
+                  <Text style={styles.badRepText}>Bad: {badReps}</Text>
+                </View>
+              </View>
+
+              {/* Form Score Badge */}
+              <View style={styles.heroRepScoreBadge}>
+                <Ionicons name="sparkles" size={11} color="#38BDF8" />
+                <Text style={styles.heroRepScoreText}>Form Score: {formScore}%</Text>
+              </View>
+            </View>
+          );
+        })()}
       </View>
 
       {/* 4. LIVE ACTIVITY & TIMER PILL (Center Floating) */}
@@ -514,6 +584,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     zIndex: 30,
+  },
+  headerLeftGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  backButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(15, 23, 42, 0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
   },
   exerciseBadge: {
     flexDirection: 'row',
@@ -706,10 +791,10 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   heroRepWidget: {
-    backgroundColor: 'rgba(15, 23, 42, 0.92)',
+    backgroundColor: 'rgba(15, 23, 42, 0.94)',
     borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     alignItems: 'center',
     borderWidth: 1.5,
     borderColor: 'rgba(16, 185, 129, 0.45)',
@@ -718,44 +803,89 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 10,
     elevation: 8,
-    minWidth: 120,
+    minWidth: 135,
+    gap: 4,
   },
   heroRepLabel: {
     color: '#94A3B8',
     fontSize: 9,
     fontWeight: '800',
-    letterSpacing: 1,
+    letterSpacing: 1.2,
   },
   heroRepNumberRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
-    gap: 4,
+    gap: 3,
     marginVertical: 1,
   },
   heroRepNumber: {
     color: '#FFFFFF',
-    fontSize: 38,
+    fontSize: 32,
     fontWeight: '900',
     fontVariant: ['tabular-nums'],
     letterSpacing: -1,
   },
-  heroRepUnit: {
+  heroRepTargetDivider: {
+    color: '#64748B',
+    fontSize: 18,
+    fontWeight: '700',
+    marginHorizontal: 1,
+  },
+  heroRepTargetNumber: {
+    color: '#94A3B8',
+    fontSize: 20,
+    fontWeight: '800',
+    fontVariant: ['tabular-nums'],
+  },
+  heroRepStatsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginVertical: 1,
+  },
+  goodRepPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    gap: 3,
+  },
+  goodRepText: {
     color: '#10B981',
-    fontSize: 12,
+    fontSize: 9,
+    fontWeight: '800',
+  },
+  badRepPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    gap: 3,
+  },
+  badRepText: {
+    color: '#F87171',
+    fontSize: 9,
     fontWeight: '800',
   },
   heroRepScoreBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    backgroundColor: 'rgba(56, 189, 248, 0.12)',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(56, 189, 248, 0.3)',
     gap: 4,
+    marginTop: 1,
   },
   heroRepScoreText: {
-    color: '#10B981',
-    fontSize: 10,
+    color: '#38BDF8',
+    fontSize: 9,
     fontWeight: '800',
   },
   liveTimerPill: {
@@ -858,5 +988,56 @@ const styles = StyleSheet.create({
     borderBottomWidth: 3,
     borderRightWidth: 3,
     borderBottomRightRadius: 6,
+  },
+  geminiVisionPillWrapper: {
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: 8,
+    paddingHorizontal: 16,
+  },
+  geminiVisionPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(15, 23, 42, 0.94)',
+    borderRadius: 20,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    gap: 8,
+    maxWidth: '96%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  geminiVisionWarning: {
+    borderColor: 'rgba(245, 158, 11, 0.8)',
+    backgroundColor: 'rgba(30, 20, 10, 0.92)',
+  },
+  geminiVisionGood: {
+    borderColor: 'rgba(56, 189, 248, 0.8)',
+    backgroundColor: 'rgba(15, 23, 42, 0.92)',
+  },
+  geminiBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: 'rgba(56, 189, 248, 0.15)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  geminiBadgeText: {
+    color: '#38BDF8',
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  geminiVisionText: {
+    color: '#F1F5F9',
+    fontSize: 12,
+    fontWeight: '600',
+    flexShrink: 1,
   },
 });

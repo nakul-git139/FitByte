@@ -9,6 +9,8 @@ export abstract class BaseExerciseEngine {
 
   protected repCount: number = 0;
   protected perfectReps: number = 0;
+  protected badReps: number = 0;
+  protected targetReps: number = 12;
   protected currentPhase: ExercisePhase = 'IDLE';
 
   constructor(exerciseName: string) {
@@ -25,6 +27,7 @@ export abstract class BaseExerciseEngine {
   public reset(): void {
     this.repCount = 0;
     this.perfectReps = 0;
+    this.badReps = 0;
     this.currentPhase = 'IDLE';
     this.landmarkProcessor.reset();
     this.feedbackManager.reset();
@@ -36,6 +39,22 @@ export abstract class BaseExerciseEngine {
 
   public getPerfectReps(): number {
     return this.perfectReps;
+  }
+
+  public getGoodReps(): number {
+    return this.perfectReps;
+  }
+
+  public getBadReps(): number {
+    return Math.max(0, this.repCount - this.perfectReps);
+  }
+
+  public getTargetReps(): number {
+    return this.targetReps;
+  }
+
+  public setTargetReps(target: number): void {
+    this.targetReps = target;
   }
 
   public getAccuracyScore(): number {
