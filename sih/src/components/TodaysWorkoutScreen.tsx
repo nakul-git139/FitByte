@@ -17,6 +17,7 @@ interface TodaysWorkoutScreenProps {
   generatedWorkout?: GeneratedWorkout | null;
   onStartWorkout: (initialExercise?: string) => void;
   onEditCheckIn: () => void;
+  onBack?: () => void;
 }
 
 export const TodaysWorkoutScreen: React.FC<TodaysWorkoutScreenProps> = ({
@@ -24,6 +25,7 @@ export const TodaysWorkoutScreen: React.FC<TodaysWorkoutScreenProps> = ({
   generatedWorkout,
   onStartWorkout,
   onEditCheckIn,
+  onBack,
 }) => {
   const [selectedExerciseIndex, setSelectedExerciseIndex] = useState<number>(0);
 
@@ -74,12 +76,23 @@ export const TodaysWorkoutScreen: React.FC<TodaysWorkoutScreenProps> = ({
       >
         {/* Top Header */}
         <View style={styles.headerRow}>
-          <View>
-            <View style={styles.badgeRow}>
-              <Ionicons name="sparkles" size={13} color="#10B981" />
-              <Text style={styles.headerTag}>GEMINI GENERATED PLAN</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            {onBack && (
+              <TouchableOpacity
+                style={styles.backButton}
+                onPress={onBack}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="arrow-back" size={20} color="#E2E8F0" />
+              </TouchableOpacity>
+            )}
+            <View>
+              <View style={styles.badgeRow}>
+                <Ionicons name="sparkles" size={13} color="#10B981" />
+                <Text style={styles.headerTag}>GEMINI GENERATED PLAN</Text>
+              </View>
+              <Text style={styles.headerTitle}>Today's Workout</Text>
             </View>
-            <Text style={styles.headerTitle}>Today's Workout</Text>
           </View>
           <TouchableOpacity
             style={styles.editPill}
@@ -250,6 +263,16 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 20,
+  },
+  backButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#1E293B',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
   badgeRow: {
     flexDirection: 'row',

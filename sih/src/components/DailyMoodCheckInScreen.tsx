@@ -38,6 +38,7 @@ interface DailyMoodCheckInScreenProps {
   initialEnergy?: number;
   onSubmitCheckIn: (data: MoodCheckInData, workout?: GeneratedWorkout) => void;
   onSkip?: () => void;
+  onBack?: () => void;
 }
 
 export const DailyMoodCheckInScreen: React.FC<DailyMoodCheckInScreenProps> = ({
@@ -45,6 +46,7 @@ export const DailyMoodCheckInScreen: React.FC<DailyMoodCheckInScreenProps> = ({
   initialEnergy = 3,
   onSubmitCheckIn,
   onSkip,
+  onBack,
 }) => {
   const [selectedMood, setSelectedMood] = useState<MoodType | null>(initialMood || null);
   const [energyLevel, setEnergyLevel] = useState<number>(initialEnergy);
@@ -124,6 +126,17 @@ export const DailyMoodCheckInScreen: React.FC<DailyMoodCheckInScreenProps> = ({
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+        {/* Top Nav Row */}
+        {onBack && (
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={onBack}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="arrow-back" size={22} color="#E2E8F0" />
+          </TouchableOpacity>
+        )}
+
         {/* Header Badge & Title */}
         <View style={styles.headerSection}>
           <View style={styles.badgePill}>
@@ -295,6 +308,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 16,
     paddingBottom: 36,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#1E293B',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
   headerSection: {
     marginBottom: 24,
