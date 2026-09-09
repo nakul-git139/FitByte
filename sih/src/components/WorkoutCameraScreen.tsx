@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { StyleSheet, View, Text, Modal, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, Text, Modal, TouchableOpacity, ScrollView } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,12 +15,20 @@ import { WorkoutControls } from './WorkoutControls';
 import { WorkoutSummaryModal } from './WorkoutSummaryModal';
 import { MediaPipePoseTracker } from './MediaPipePoseTracker';
 
-const EXERCISE_OPTIONS = ['Pushups', 'Squats'];
+const EXERCISE_OPTIONS = [
+  { name: 'Pushups', icon: 'barbell-outline' as const },
+  { name: 'Squats', icon: 'body-outline' as const },
+  { name: 'Pullups', icon: 'trending-up-outline' as const },
+  { name: 'Plank', icon: 'timer-outline' as const },
+  { name: 'Bicep Curls', icon: 'fitness-outline' as const },
+  { name: 'Jumping Jacks', icon: 'walk-outline' as const },
+  { name: 'Mountain Climbers', icon: 'flame-outline' as const },
+  { name: 'Lunges', icon: 'footsteps-outline' as const },
+];
 
 export const WorkoutCameraScreen: React.FC = () => {
   const [permission, requestPermission] = useCameraPermissions();
   const [facing, setFacing] = useState<CameraFacing>('front');
-  const [enableTorch, setEnableTorch] = useState<boolean>(false);
   const [showPoseSkeleton, setShowPoseSkeleton] = useState<boolean>(true);
   const [isMuted, setIsMuted] = useState<boolean>(false);
 
@@ -33,6 +41,8 @@ export const WorkoutCameraScreen: React.FC = () => {
   const [liveElbowAngle, setLiveElbowAngle] = useState<number>(0);
   const [liveHipAngle, setLiveHipAngle] = useState<number>(0);
   const [liveElbowWidthRatio, setLiveElbowWidthRatio] = useState<number>(0);
+  const [liveFeetSpanRatio, setLiveFeetSpanRatio] = useState<number>(0);
+  const [livePrimaryAngle, setLivePrimaryAngle] = useState<number>(0);
   const [detectedJointCount, setDetectedJointCount] = useState<number>(0);
   const [currentPhase, setCurrentPhase] = useState<ExercisePhase>('IDLE');
 
@@ -69,8 +79,8 @@ export const WorkoutCameraScreen: React.FC = () => {
           const nextActive = prevStats.activeSeconds + 1;
 
           // METs calorie calculation
-          const repKcal = prevStats.repCount * (selectedExercise === 'Pushups' ? 0.48 : 0.40);
-          const activeKcal = (nextActive / 60) * 4.0;
+          const repKcal = prevStats.repCount * (selectedExercise === 'Pushups' || selectedExercise === 'Pullups' ? 0.48 : 0.40);
+          const activeKcal = (nextActive / 60) * 4.2;
           const totalCalories = Math.round(repKcal + activeKcal);
 
           return {
@@ -141,11 +151,17 @@ export const WorkoutCameraScreen: React.FC = () => {
       setHighlightJoints(result.highlightJoints);
       setVisibilityStatus(result.visibilityStatus);
 
-      if (result.metrics.hipAngle !== undefined) {
+      if (result.metrics.primaryAngle !== undefined && typeof result.metrics.primaryAngle === 'number') {
+        setLivePrimaryAngle(result.metrics.primaryAngle);
+      }
+      if (result.metrics.hipAngle !== undefined && typeof result.metrics.hipAngle === 'number') {
         setLiveHipAngle(result.metrics.hipAngle);
       }
-      if (result.metrics.elbowWidthRatio !== undefined) {
+      if (result.metrics.elbowWidthRatio !== undefined && typeof result.metrics.elbowWidthRatio === 'number') {
         setLiveElbowWidthRatio(result.metrics.elbowWidthRatio);
+      }
+      if (result.metrics.feetSpanRatio !== undefined && typeof result.metrics.feetSpanRatio === 'number') {
+        setLiveFeetSpanRatio(result.metrics.feetSpanRatio);
       }
 
       // If workout is active, track reps and scores
@@ -166,8 +182,8 @@ export const WorkoutCameraScreen: React.FC = () => {
         }
 
         setStats((prev) => {
-          const repKcal = result.repCount * (selectedExercise === 'Pushups' ? 0.48 : 0.40);
-          const activeKcal = (prev.activeSeconds / 60) * 4.0;
+          const repKcal = result.repCount * (selectedExercise === 'Pushups' || selectedExercise === 'Pullups' ? 0.48 : 0.40);
+          const activeKcal = (prev.activeSeconds / 60) * 4.2;
 
           return {
             ...prev,
@@ -185,12 +201,6 @@ export const WorkoutCameraScreen: React.FC = () => {
   const handleToggleFacing = () => {
     triggerHaptic('light');
     setFacing((prev) => (prev === 'front' ? 'back' : 'front'));
-  };
-
-  // Torch Toggle
-  const handleToggleTorch = () => {
-    triggerHaptic('light');
-    setEnableTorch((prev) => !prev);
   };
 
   // Mute / Unmute Voice Feedback
@@ -247,6 +257,9 @@ export const WorkoutCameraScreen: React.FC = () => {
   const handleStopWorkout = () => {
     triggerHaptic('heavy');
     const now = new Date();
+    const isIsometric = selectedExercise === 'Plank';
+    const repUnit = isIsometric ? 'seconds' : 'repetitions';
+
     const completedSummary: WorkoutSummary = {
       id: Date.now().toString(),
       workoutType: selectedExercise,
@@ -262,7 +275,7 @@ export const WorkoutCameraScreen: React.FC = () => {
     setWorkoutStatus('completed');
     setSummaryData(completedSummary);
     setShowSummaryModal(true);
-    SpeechService.speak(`Workout completed. Great job! You completed ${stats.repCount} repetitions.`);
+    SpeechService.speak(`Workout completed. Great job! You achieved ${stats.repCount} ${repUnit}.`);
   };
 
   const handleSaveSummary = () => {
@@ -331,16 +344,14 @@ export const WorkoutCameraScreen: React.FC = () => {
         <CameraView
           style={StyleSheet.absoluteFill}
           facing={facing}
-          enableTorch={enableTorch}
         />
       )}
 
-      {/* Head-Up Display (HUD) with Real-Time AI Form Corrections */}
+      {/* Head-Up Display (HUD) with Real-Time AI Form Corrections & Hero Rep Widget */}
       <WorkoutHUDOverlay
         status={workoutStatus}
         stats={stats}
         facing={facing}
-        enableTorch={enableTorch}
         isMuted={isMuted}
         selectedExercise={selectedExercise}
         showPoseSkeleton={showPoseSkeleton}
@@ -349,12 +360,13 @@ export const WorkoutCameraScreen: React.FC = () => {
         elbowAngle={liveElbowAngle}
         hipAngle={liveHipAngle}
         elbowWidthRatio={liveElbowWidthRatio}
+        feetSpanRatio={liveFeetSpanRatio}
+        primaryAngle={livePrimaryAngle}
         jointCount={detectedJointCount}
         primaryFeedback={primaryFeedback}
         isGoodForm={isGoodForm}
         visibilityStatus={visibilityStatus}
         onToggleFacing={handleToggleFacing}
-        onToggleTorch={handleToggleTorch}
         onToggleMute={handleToggleMute}
         onSelectExercise={handleSelectExercise}
         onTogglePoseSkeleton={handleTogglePoseSkeleton}
@@ -389,44 +401,46 @@ export const WorkoutCameraScreen: React.FC = () => {
         <View style={styles.exerciseModalOverlay}>
           <View style={styles.exerciseModalSheet}>
             <View style={styles.sheetHeader}>
-              <Text style={styles.sheetTitle}>Select Exercise</Text>
+              <Text style={styles.sheetTitle}>Choose Exercise</Text>
               <TouchableOpacity onPress={() => setShowExercisePicker(false)}>
                 <Ionicons name="close-circle" size={26} color="#94A3B8" />
               </TouchableOpacity>
             </View>
 
-            {EXERCISE_OPTIONS.map((item) => (
-              <TouchableOpacity
-                key={item}
-                style={[
-                  styles.exerciseOption,
-                  selectedExercise === item && styles.selectedExerciseOption,
-                ]}
-                onPress={() => {
-                  setSelectedExercise(item);
-                  setShowExercisePicker(false);
-                }}
-              >
-                <View style={styles.exerciseOptionLeft}>
-                  <Ionicons
-                    name={item === 'Pushups' ? 'barbell-outline' : 'body-outline'}
-                    size={22}
-                    color={selectedExercise === item ? '#10B981' : '#94A3B8'}
-                  />
-                  <Text
-                    style={[
-                      styles.exerciseOptionText,
-                      selectedExercise === item && styles.selectedExerciseOptionText,
-                    ]}
-                  >
-                    {item}
-                  </Text>
-                </View>
-                {selectedExercise === item && (
-                  <Ionicons name="checkmark-circle" size={20} color="#10B981" />
-                )}
-              </TouchableOpacity>
-            ))}
+            <ScrollView style={styles.exerciseScrollList} showsVerticalScrollIndicator={false}>
+              {EXERCISE_OPTIONS.map((item) => (
+                <TouchableOpacity
+                  key={item.name}
+                  style={[
+                    styles.exerciseOption,
+                    selectedExercise === item.name && styles.selectedExerciseOption,
+                  ]}
+                  onPress={() => {
+                    setSelectedExercise(item.name);
+                    setShowExercisePicker(false);
+                  }}
+                >
+                  <View style={styles.exerciseOptionLeft}>
+                    <Ionicons
+                      name={item.icon}
+                      size={22}
+                      color={selectedExercise === item.name ? '#10B981' : '#94A3B8'}
+                    />
+                    <Text
+                      style={[
+                        styles.exerciseOptionText,
+                        selectedExercise === item.name && styles.selectedExerciseOptionText,
+                      ]}
+                    >
+                      {item.name}
+                    </Text>
+                  </View>
+                  {selectedExercise === item.name && (
+                    <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -452,10 +466,11 @@ const styles = StyleSheet.create({
   },
   bottomControlsWrapper: {
     position: 'absolute',
-    bottom: 24,
+    bottom: 0,
     left: 0,
     right: 0,
     alignItems: 'center',
+    zIndex: 40,
   },
   exerciseModalOverlay: {
     flex: 1,
@@ -466,8 +481,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#1E293B',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    padding: 24,
-    gap: 12,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 36,
+    maxHeight: '75%',
     borderTopWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
   },
@@ -475,23 +492,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: 16,
   },
   sheetTitle: {
     color: '#F8FAFC',
     fontSize: 18,
-    fontWeight: '700',
+    fontWeight: '800',
+  },
+  exerciseScrollList: {
+    maxHeight: 380,
   },
   exerciseOption: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: '#0F172A',
-    paddingVertical: 16,
-    paddingHorizontal: 18,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: 'transparent',
+    marginBottom: 8,
   },
   exerciseOptionLeft: {
     flexDirection: 'row',
@@ -504,7 +525,7 @@ const styles = StyleSheet.create({
   },
   exerciseOptionText: {
     color: '#CBD5E1',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
   },
   selectedExerciseOptionText: {

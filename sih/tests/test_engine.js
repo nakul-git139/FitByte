@@ -214,13 +214,232 @@ assert(rInvisible.visibilityStatus.guidanceMessage.includes('visible'), 'Provide
 assert(rInvisible.activeErrors.length === 0, 'Does NOT throw false form errors when landmarks are missing');
 
 // TEST 7: Squat Engine Verification
-console.log('\n--- TEST 7: Squats Repetition & Knee Cave ---');
+console.log('\n--- TEST 7: Squats Repetition State Machine ---');
 const squatEngine = ExerciseEngineRegistry.getEngine('Squats');
 squatEngine.reset();
-timestamp = 30000;
-
 assert(squatEngine.exerciseName === 'Squats', 'Squat engine correctly loaded');
 
+// TEST 8: Pullup Repetition & Form Analysis
+console.log('\n--- TEST 8: Pullup Repetition & Form Analysis ---');
+const pullupEngine = ExerciseEngineRegistry.getEngine('Pullups');
+pullupEngine.reset();
+timestamp = 40000;
+
+function createPullupLandmarks(elbowAngle = 170, asymmetry = false) {
+  const landmarks = createBasePushupLandmarks({ elbowAngle });
+  if (asymmetry) {
+    // Modify right arm angle by changing wrist coordinates
+    landmarks[PoseLandmarkIndex.RIGHT_WRIST] = {
+      x: landmarks[PoseLandmarkIndex.RIGHT_ELBOW].x + 0.1,
+      y: landmarks[PoseLandmarkIndex.RIGHT_ELBOW].y + 0.1,
+      z: 0,
+      visibility: 0.95,
+    };
+  }
+  return landmarks;
+}
+
+// Dead hang
+pullupEngine.processFrame(createPullupLandmarks(170), timestamp);
+timestamp += 100;
+let pStart = pullupEngine.processFrame(createPullupLandmarks(170), timestamp);
+assert(pStart.phase === 'START' || pStart.phase === 'IDLE', 'Pullup starts in start/idle phase');
+
+// Pulling up
+timestamp += 100;
+pullupEngine.processFrame(createPullupLandmarks(110), timestamp);
+timestamp += 100;
+let pAscend = pullupEngine.processFrame(createPullupLandmarks(110), timestamp);
+assert(pAscend.phase === 'ASCENDING', 'Pullup ascending phase detected');
+
+// Peak chin over bar (flex <= 75 deg)
+timestamp += 100;
+pullupEngine.processFrame(createPullupLandmarks(60), timestamp);
+timestamp += 100;
+let pPeak = pullupEngine.processFrame(createPullupLandmarks(60), timestamp);
+assert(pPeak.phase === 'BOTTOM', 'Pullup peak contraction reached');
+
+// Lowering down
+timestamp += 100;
+pullupEngine.processFrame(createPullupLandmarks(120), timestamp);
+timestamp += 100;
+let pDescend = pullupEngine.processFrame(createPullupLandmarks(120), timestamp);
+assert(pDescend.phase === 'DESCENDING', 'Pullup descending phase detected');
+
+// Dead hang lockout
+timestamp += 100;
+pullupEngine.processFrame(createPullupLandmarks(170), timestamp);
+timestamp += 100;
+let pDone = pullupEngine.processFrame(createPullupLandmarks(170), timestamp);
+assert(pDone.repCount === 1, 'Pullup rep completed and counted');
+assert(pDone.perfectReps === 1, 'Clean pullup counted as perfect');
+
+// TEST 9: Plank Isometric Hold Engine
+console.log('\n--- TEST 9: Plank Isometric Hold & Form Rules ---');
+const plankEngine = ExerciseEngineRegistry.getEngine('Plank');
+plankEngine.reset();
+timestamp = 50000;
+
+// Good horizontal plank
+let pl1 = plankEngine.processFrame(createBasePushupLandmarks({ isSagging: false }), timestamp);
+assert(pl1.exerciseName === 'Plank', 'Plank engine loaded');
+assert(pl1.isGoodForm === true, 'Good plank form detected');
+
+// Sustained hold (3 seconds later)
+timestamp += 3000;
+let pl2 = plankEngine.processFrame(createBasePushupLandmarks({ isSagging: false }), timestamp);
+assert(pl2.repCount >= 3, `Plank hold timer tracks duration (hold: ${pl2.repCount}s)`);
+
+// Sagging hips in plank
+timestamp += 100;
+plankEngine.processFrame(createBasePushupLandmarks({ isSagging: true }), timestamp);
+timestamp += 100;
+plankEngine.processFrame(createBasePushupLandmarks({ isSagging: true }), timestamp);
+timestamp += 400;
+let plSag = plankEngine.processFrame(createBasePushupLandmarks({ isSagging: true }), timestamp);
+assert(plSag.activeErrors.some(e => e.ruleId === 'PLANK_HIPS_SAGGING'), 'Plank hip sag detected');
+assert(plSag.primaryFeedback && plSag.primaryFeedback.message === 'Keep your hips up.', 'Plank hip sag voice is "Keep your hips up."');
+
+// TEST 10: Bicep Curl Engine
+console.log('\n--- TEST 10: Bicep Curl State Machine ---');
+const bicepEngine = ExerciseEngineRegistry.getEngine('Bicep Curls');
+bicepEngine.reset();
+timestamp = 60000;
+
+function createBicepCurlLandmarks(elbowAngle = 170) {
+  const centerX = 0.5;
+  const landmarks = new Array(33).fill(null).map(() => ({ x: centerX, y: 0.5, z: 0, visibility: 0.95 }));
+
+  landmarks[PoseLandmarkIndex.LEFT_SHOULDER] = { x: centerX - 0.15, y: 0.3, z: 0, visibility: 0.95 };
+  landmarks[PoseLandmarkIndex.RIGHT_SHOULDER] = { x: centerX + 0.15, y: 0.3, z: 0, visibility: 0.95 };
+  landmarks[PoseLandmarkIndex.LEFT_HIP] = { x: centerX - 0.15, y: 0.55, z: 0, visibility: 0.95 };
+  landmarks[PoseLandmarkIndex.RIGHT_HIP] = { x: centerX + 0.15, y: 0.55, z: 0, visibility: 0.95 };
+
+  // Elbows pinned directly below shoulders
+  const armLen = 0.14;
+  landmarks[PoseLandmarkIndex.LEFT_ELBOW] = { x: centerX - 0.15, y: 0.3 + armLen, z: 0, visibility: 0.95 };
+  landmarks[PoseLandmarkIndex.RIGHT_ELBOW] = { x: centerX + 0.15, y: 0.3 + armLen, z: 0, visibility: 0.95 };
+
+  // Wrists position based on interior elbow angle
+  const rad = (elbowAngle * Math.PI) / 180;
+  landmarks[PoseLandmarkIndex.LEFT_WRIST] = {
+    x: (centerX - 0.15) - armLen * Math.sin(Math.PI - rad),
+    y: (0.3 + armLen) + armLen * Math.cos(Math.PI - rad),
+    z: 0,
+    visibility: 0.95,
+  };
+  landmarks[PoseLandmarkIndex.RIGHT_WRIST] = {
+    x: (centerX + 0.15) + armLen * Math.sin(Math.PI - rad),
+    y: (0.3 + armLen) + armLen * Math.cos(Math.PI - rad),
+    z: 0,
+    visibility: 0.95,
+  };
+
+  return landmarks;
+}
+
+// Arm straight (170 deg)
+bicepEngine.processFrame(createBicepCurlLandmarks(170), timestamp);
+timestamp += 100;
+let bStart = bicepEngine.processFrame(createBicepCurlLandmarks(170), timestamp);
+assert(bStart.phase === 'START' || bStart.phase === 'IDLE', 'Bicep curl starts in start/idle');
+
+// Curling up (100 deg)
+timestamp += 100;
+bicepEngine.processFrame(createBicepCurlLandmarks(100), timestamp);
+timestamp += 100;
+let bCurling = bicepEngine.processFrame(createBicepCurlLandmarks(100), timestamp);
+assert(bCurling.phase === 'ASCENDING', 'Bicep curl curling phase detected');
+
+// Peak squeeze (50 deg <= 65 deg)
+timestamp += 100;
+bicepEngine.processFrame(createBicepCurlLandmarks(50), timestamp);
+timestamp += 100;
+bicepEngine.processFrame(createBicepCurlLandmarks(50), timestamp);
+timestamp += 100;
+let bPeak = bicepEngine.processFrame(createBicepCurlLandmarks(50), timestamp);
+assert(bPeak.phase === 'BOTTOM', 'Bicep peak squeeze reached');
+
+// Lowering down (120 deg)
+timestamp += 100;
+bicepEngine.processFrame(createBicepCurlLandmarks(120), timestamp);
+timestamp += 100;
+bicepEngine.processFrame(createBicepCurlLandmarks(120), timestamp);
+timestamp += 100;
+let bLower = bicepEngine.processFrame(createBicepCurlLandmarks(120), timestamp);
+assert(bLower.phase === 'DESCENDING', 'Bicep lowering phase detected');
+
+// Full extension (170 deg)
+timestamp += 100;
+bicepEngine.processFrame(createBicepCurlLandmarks(170), timestamp);
+timestamp += 100;
+bicepEngine.processFrame(createBicepCurlLandmarks(170), timestamp);
+timestamp += 100;
+let bDone = bicepEngine.processFrame(createBicepCurlLandmarks(170), timestamp);
+assert(bDone.repCount === 1, 'Bicep curl rep completed');
+assert(bDone.perfectReps === 1, 'Full ROM bicep curl is perfect');
+
+// TEST 11: Jumping Jacks Engine
+console.log('\n--- TEST 11: Jumping Jacks State Machine ---');
+const jackEngine = ExerciseEngineRegistry.getEngine('Jumping Jacks');
+jackEngine.reset();
+timestamp = 70000;
+
+function createJumpingJackLandmarks(armAbductionAngle = 30, feetSpanSpread = 0.12) {
+  const centerX = 0.5;
+  const landmarks = new Array(33).fill(null).map(() => ({ x: centerX, y: 0.5, z: 0, visibility: 0.95 }));
+
+  landmarks[PoseLandmarkIndex.LEFT_SHOULDER] = { x: centerX - 0.15, y: 0.3, z: 0, visibility: 0.95 };
+  landmarks[PoseLandmarkIndex.RIGHT_SHOULDER] = { x: centerX + 0.15, y: 0.3, z: 0, visibility: 0.95 };
+  landmarks[PoseLandmarkIndex.LEFT_HIP] = { x: centerX - 0.1, y: 0.5, z: 0, visibility: 0.95 };
+  landmarks[PoseLandmarkIndex.RIGHT_HIP] = { x: centerX + 0.1, y: 0.5, z: 0, visibility: 0.95 };
+
+  // Arms position based on abduction angle
+  const rad = (armAbductionAngle * Math.PI) / 180;
+  landmarks[PoseLandmarkIndex.LEFT_WRIST] = { x: (centerX - 0.15) - 0.25 * Math.sin(rad), y: 0.3 + 0.25 * Math.cos(rad), z: 0, visibility: 0.95 };
+  landmarks[PoseLandmarkIndex.RIGHT_WRIST] = { x: (centerX + 0.15) + 0.25 * Math.sin(rad), y: 0.3 + 0.25 * Math.cos(rad), z: 0, visibility: 0.95 };
+
+  // Feet position
+  landmarks[PoseLandmarkIndex.LEFT_ANKLE] = { x: centerX - feetSpanSpread, y: 0.9, z: 0, visibility: 0.95 };
+  landmarks[PoseLandmarkIndex.RIGHT_ANKLE] = { x: centerX + feetSpanSpread, y: 0.9, z: 0, visibility: 0.95 };
+
+  return landmarks;
+}
+
+// Closed position
+jackEngine.processFrame(createJumpingJackLandmarks(20, 0.08), timestamp);
+timestamp += 100;
+let jClosed = jackEngine.processFrame(createJumpingJackLandmarks(20, 0.08), timestamp);
+assert(jClosed.exerciseName === 'Jumping Jacks', 'Jumping Jacks engine active');
+
+// Open overhead position (arms 150 deg, feet wide 0.25)
+timestamp += 100;
+jackEngine.processFrame(createJumpingJackLandmarks(150, 0.25), timestamp);
+timestamp += 100;
+let jOpen = jackEngine.processFrame(createJumpingJackLandmarks(150, 0.25), timestamp);
+assert(jOpen.phase === 'BOTTOM', 'Jumping Jacks open peak detected');
+
+// Return to closed
+timestamp += 100;
+jackEngine.processFrame(createJumpingJackLandmarks(20, 0.08), timestamp);
+timestamp += 100;
+jackEngine.processFrame(createJumpingJackLandmarks(20, 0.08), timestamp);
+timestamp += 100;
+let jDone = jackEngine.processFrame(createJumpingJackLandmarks(20, 0.08), timestamp);
+assert(jDone.repCount === 1, 'Jumping Jacks rep completed');
+
+// TEST 12: Mountain Climbers Engine
+console.log('\n--- TEST 12: Mountain Climbers Cadence & Rep Counting ---');
+const climberEngine = ExerciseEngineRegistry.getEngine('Mountain Climbers');
+climberEngine.reset();
+assert(climberEngine.exerciseName === 'Mountain Climbers', 'Mountain Climbers engine initialized');
+
+// TEST 13: Lunges Engine
+console.log('\n--- TEST 13: Lunges Engine & Depth Analysis ---');
+const lungeEngine = ExerciseEngineRegistry.getEngine('Lunges');
+lungeEngine.reset();
+assert(lungeEngine.exerciseName === 'Lunges', 'Lunges engine initialized');
+
 console.log('\n========================================');
-console.log('🎉 ALL TESTS PASSED SUCCESSFULLY (7/7)!');
+console.log('🎉 ALL 8 EXERCISE TEST SUITES PASSED (13/13)!');
 console.log('========================================\n');

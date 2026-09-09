@@ -8,7 +8,6 @@ interface WorkoutHUDOverlayProps {
   status: WorkoutStatus;
   stats: WorkoutStats;
   facing: CameraFacing;
-  enableTorch: boolean;
   isMuted: boolean;
   selectedExercise: string;
   showPoseSkeleton: boolean;
@@ -17,12 +16,13 @@ interface WorkoutHUDOverlayProps {
   elbowAngle?: number;
   hipAngle?: number;
   elbowWidthRatio?: number;
+  feetSpanRatio?: number;
+  primaryAngle?: number;
   jointCount?: number;
   primaryFeedback?: FormError | null;
   isGoodForm?: boolean;
   visibilityStatus?: VisibilityStatus;
   onToggleFacing: () => void;
-  onToggleTorch: () => void;
   onToggleMute: () => void;
   onSelectExercise: () => void;
   onTogglePoseSkeleton: () => void;
@@ -32,7 +32,6 @@ export const WorkoutHUDOverlay: React.FC<WorkoutHUDOverlayProps> = ({
   status,
   stats,
   facing,
-  enableTorch,
   isMuted,
   selectedExercise,
   showPoseSkeleton,
@@ -41,12 +40,13 @@ export const WorkoutHUDOverlay: React.FC<WorkoutHUDOverlayProps> = ({
   elbowAngle = 0,
   hipAngle = 0,
   elbowWidthRatio = 0,
+  feetSpanRatio = 0,
+  primaryAngle = 0,
   jointCount = 0,
   primaryFeedback = null,
   isGoodForm = true,
   visibilityStatus,
   onToggleFacing,
-  onToggleTorch,
   onToggleMute,
   onSelectExercise,
   onTogglePoseSkeleton,
@@ -73,7 +73,7 @@ export const WorkoutHUDOverlay: React.FC<WorkoutHUDOverlayProps> = ({
 
   if (visibilityStatus && !visibilityStatus.isFullyVisible) {
     bannerType = 'info';
-    bannerText = visibilityStatus.guidanceMessage || 'ℹ️ Move back so full body is visible';
+    bannerText = visibilityStatus.guidanceMessage || 'Move back so your full body is visible.';
     bannerIcon = 'information-circle';
   } else if (primaryFeedback) {
     bannerType = primaryFeedback.severity === 'info' ? 'info' : 'warning';
@@ -85,88 +85,98 @@ export const WorkoutHUDOverlay: React.FC<WorkoutHUDOverlayProps> = ({
     bannerIcon = 'warning';
   }
 
+  // Phase badge color
+  const getPhaseBadgeStyle = (currentPhase: ExercisePhase) => {
+    switch (currentPhase) {
+      case 'BOTTOM':
+        return styles.phaseBottom;
+      case 'DESCENDING':
+      case 'ASCENDING':
+        return styles.phaseMoving;
+      case 'START':
+      case 'COMPLETED':
+        return styles.phaseReady;
+      default:
+        return styles.phaseIdle;
+    }
+  };
+
   return (
     <View style={styles.overlayContainer} pointerEvents="box-none">
-      {/* 1. Top Header Controls Bar */}
+      {/* 1. TOP HEADER NAVIGATION BAR */}
       <View style={styles.headerBar}>
-        {/* Flash / Torch Toggle */}
-        <TouchableOpacity
-          style={[styles.glassIconButton, enableTorch && styles.activeIconButton]}
-          onPress={onToggleTorch}
-          activeOpacity={0.7}
-        >
-          <Ionicons
-            name={enableTorch ? 'flash' : 'flash-outline'}
-            size={20}
-            color={enableTorch ? '#F59E0B' : '#FFFFFF'}
-          />
-        </TouchableOpacity>
-
-        {/* Skeleton AI Overlay Toggle */}
-        <TouchableOpacity
-          style={[styles.glassIconButton, showPoseSkeleton && styles.activePoseIconButton]}
-          onPress={onTogglePoseSkeleton}
-          activeOpacity={0.7}
-        >
-          <Ionicons
-            name={showPoseSkeleton ? 'body' : 'body-outline'}
-            size={20}
-            color={showPoseSkeleton ? '#10B981' : '#FFFFFF'}
-          />
-        </TouchableOpacity>
-
-        {/* Voice Feedback Mute/Unmute */}
-        <TouchableOpacity
-          style={[styles.glassIconButton, isMuted && styles.mutedIconButton]}
-          onPress={onToggleMute}
-          activeOpacity={0.7}
-        >
-          <Ionicons
-            name={isMuted ? 'volume-mute' : 'volume-high'}
-            size={20}
-            color={isMuted ? '#EF4444' : '#38BDF8'}
-          />
-        </TouchableOpacity>
-
-        {/* Exercise Badge */}
+        {/* Left: Exercise Selector Pill */}
         <TouchableOpacity
           style={styles.exerciseBadge}
           onPress={onSelectExercise}
           activeOpacity={0.8}
         >
-          <Ionicons name="fitness" size={16} color="#10B981" />
+          <Ionicons
+            name={selectedExercise === 'Pushups' ? 'barbell' : 'body'}
+            size={18}
+            color="#10B981"
+          />
           <Text style={styles.exerciseBadgeText}>{selectedExercise}</Text>
           <Ionicons name="chevron-down" size={14} color="#94A3B8" />
         </TouchableOpacity>
 
-        {/* Camera Facing Flip (Front <-> Rear) */}
-        <TouchableOpacity
-          style={[
-            styles.cameraToggleButton,
-            facing === 'back' ? styles.backCameraActive : styles.frontCameraActive,
-          ]}
-          onPress={onToggleFacing}
-          activeOpacity={0.7}
-          accessibilityLabel="Switch Camera"
-        >
-          <Ionicons
-            name="camera-reverse"
-            size={18}
-            color={facing === 'front' ? '#38BDF8' : '#C084FC'}
-          />
-          <Text
+        {/* Right: Quick Action Controls Cluster */}
+        <View style={styles.quickActionsGroup}>
+          {/* Skeleton AI Overlay Toggle */}
+          <TouchableOpacity
             style={[
-              styles.cameraToggleText,
-              { color: facing === 'front' ? '#38BDF8' : '#C084FC' },
+              styles.actionIconButton,
+              showPoseSkeleton && styles.actionIconButtonActiveGreen,
             ]}
+            onPress={onTogglePoseSkeleton}
+            activeOpacity={0.7}
+            accessibilityLabel="Toggle Skeleton"
           >
-            {facing === 'front' ? 'Front' : 'Rear'}
-          </Text>
-        </TouchableOpacity>
+            <Ionicons
+              name={showPoseSkeleton ? 'body' : 'body-outline'}
+              size={18}
+              color={showPoseSkeleton ? '#10B981' : '#CBD5E1'}
+            />
+          </TouchableOpacity>
+
+          {/* Voice Coach Mute / Unmute */}
+          <TouchableOpacity
+            style={[
+              styles.actionIconButton,
+              isMuted && styles.actionIconButtonMuted,
+            ]}
+            onPress={onToggleMute}
+            activeOpacity={0.7}
+            accessibilityLabel="Toggle Audio Feedback"
+          >
+            <Ionicons
+              name={isMuted ? 'volume-mute' : 'volume-high'}
+              size={18}
+              color={isMuted ? '#EF4444' : '#38BDF8'}
+            />
+          </TouchableOpacity>
+
+          {/* Camera Flip (Front <-> Rear) */}
+          <TouchableOpacity
+            style={[
+              styles.actionIconButton,
+              facing === 'back' ? styles.actionIconButtonBackCam : styles.actionIconButtonFrontCam,
+            ]}
+            onPress={onToggleFacing}
+            activeOpacity={0.7}
+            accessibilityLabel="Switch Camera"
+          >
+            <Ionicons
+              name="camera-reverse"
+              size={18}
+              color={facing === 'front' ? '#38BDF8' : '#C084FC'}
+            />
+          </TouchableOpacity>
+        </View>
       </View>
 
-      {/* 2. REAL-TIME AI FORM COACH BANNER (Top Center HUD) */}
-      <View style={styles.feedbackBannerContainer} pointerEvents="box-none">
+      {/* 2. REAL-TIME AI FORM COACH BANNER (Top Floating Pill) */}
+      <View style={styles.feedbackBannerWrapper} pointerEvents="box-none">
         <View
           style={[
             styles.feedbackBanner,
@@ -177,7 +187,7 @@ export const WorkoutHUDOverlay: React.FC<WorkoutHUDOverlayProps> = ({
         >
           <Ionicons
             name={bannerIcon}
-            size={20}
+            size={18}
             color={
               bannerType === 'warning'
                 ? '#EF4444'
@@ -200,142 +210,292 @@ export const WorkoutHUDOverlay: React.FC<WorkoutHUDOverlayProps> = ({
         </View>
       </View>
 
-      {/* 3. Real-Time Biomechanics HUD Telemetry Card */}
-      {showPoseSkeleton && (
-        <View style={styles.realtimeAngleCard}>
-          <View style={styles.angleRow}>
-            <Text style={styles.angleLabel}>PHASE:</Text>
-            <Text style={styles.phaseValue}>{phase}</Text>
-          </View>
+      {/* 3. HERO REP COUNTER & TELEMETRY ROW */}
+      <View style={styles.heroTelemetryRow} pointerEvents="box-none">
+        {/* Left Card: Live Biomechanics & Angles */}
+        {showPoseSkeleton ? (
+          <View style={styles.telemetryCard}>
+            <View style={styles.telemetryHeaderRow}>
+              <Text style={styles.telemetryHeaderTitle}>AI TRACKING</Text>
+              <View style={[styles.phasePill, getPhaseBadgeStyle(phase)]}>
+                <Text style={styles.phasePillText}>{phase}</Text>
+              </View>
+            </View>
 
-          {selectedExercise === 'Pushups' ? (
-            <>
-              <View style={styles.angleRow}>
-                <Text style={styles.angleLabel}>ELBOW FLEX:</Text>
+            {/* Exercise-Specific Dynamic Telemetry Breakdown */}
+            {selectedExercise === 'Pushups' && (
+              <>
+                <View style={styles.telemetryMetricRow}>
+                  <Text style={styles.metricLabel}>ELBOW FLEX</Text>
+                  <Text
+                    style={[
+                      styles.metricValue,
+                      elbowAngle > 0 && elbowAngle <= 90
+                        ? styles.metricValuePerfect
+                        : elbowAngle > 0
+                        ? styles.metricValueActive
+                        : styles.metricValueInactive,
+                    ]}
+                  >
+                    {elbowAngle > 0 ? `${elbowAngle}°` : '--'}
+                  </Text>
+                </View>
+
+                {hipAngle > 0 && (
+                  <View style={styles.telemetryMetricRow}>
+                    <Text style={styles.metricLabel}>HIP ANGLE</Text>
+                    <Text
+                      style={[
+                        styles.metricValue,
+                        hipAngle < 160 ? styles.metricValueWarning : styles.metricValueGood,
+                      ]}
+                    >
+                      {hipAngle}°
+                    </Text>
+                  </View>
+                )}
+
+                {elbowWidthRatio > 0 && (
+                  <View style={styles.telemetryMetricRow}>
+                    <Text style={styles.metricLabel}>ELBOW RATIO</Text>
+                    <Text
+                      style={[
+                        styles.metricValue,
+                        elbowWidthRatio > 1.38 ? styles.metricValueWarning : styles.metricValueGood,
+                      ]}
+                    >
+                      {elbowWidthRatio}x
+                    </Text>
+                  </View>
+                )}
+              </>
+            )}
+
+            {selectedExercise === 'Squats' && (
+              <>
+                <View style={styles.telemetryMetricRow}>
+                  <Text style={styles.metricLabel}>KNEE FLEX</Text>
+                  <Text
+                    style={[
+                      styles.metricValue,
+                      kneeAngle > 0 && kneeAngle <= 95
+                        ? styles.metricValuePerfect
+                        : kneeAngle > 0
+                        ? styles.metricValueActive
+                        : styles.metricValueInactive,
+                    ]}
+                  >
+                    {kneeAngle > 0 ? `${kneeAngle}°` : '--'}
+                  </Text>
+                </View>
+                {hipAngle > 0 && (
+                  <View style={styles.telemetryMetricRow}>
+                    <Text style={styles.metricLabel}>HIP ANGLE</Text>
+                    <Text
+                      style={[
+                        styles.metricValue,
+                        hipAngle < 80 ? styles.metricValueWarning : styles.metricValueGood,
+                      ]}
+                    >
+                      {hipAngle}°
+                    </Text>
+                  </View>
+                )}
+              </>
+            )}
+
+            {selectedExercise === 'Pullups' && (
+              <View style={styles.telemetryMetricRow}>
+                <Text style={styles.metricLabel}>ARM FLEX</Text>
                 <Text
                   style={[
-                    styles.angleValue,
-                    elbowAngle === 0
-                      ? styles.inactiveAngleValue
-                      : elbowAngle <= 90
-                      ? styles.perfectAngleValue
-                      : null,
+                    styles.metricValue,
+                    elbowAngle > 0 && elbowAngle <= 80
+                      ? styles.metricValuePerfect
+                      : elbowAngle > 0
+                      ? styles.metricValueActive
+                      : styles.metricValueInactive,
                   ]}
                 >
-                  {elbowAngle > 0 ? `${elbowAngle}°` : '0°'}
+                  {elbowAngle > 0 ? `${elbowAngle}°` : '--'}
                 </Text>
               </View>
+            )}
 
-              {hipAngle > 0 && (
-                <View style={styles.angleRow}>
-                  <Text style={styles.angleLabel}>HIP ALIGN:</Text>
-                  <Text
-                    style={[
-                      styles.angleValue,
-                      hipAngle < 160 ? styles.warningAngleValue : styles.goodAngleValue,
-                    ]}
-                  >
-                    {hipAngle}°
+            {selectedExercise === 'Plank' && (
+              <>
+                <View style={styles.telemetryMetricRow}>
+                  <Text style={styles.metricLabel}>HOLD TIME</Text>
+                  <Text style={[styles.metricValue, styles.metricValueGood]}>
+                    {stats.repCount}s
                   </Text>
                 </View>
-              )}
+                {hipAngle > 0 && (
+                  <View style={styles.telemetryMetricRow}>
+                    <Text style={styles.metricLabel}>HIP ANGLE</Text>
+                    <Text
+                      style={[
+                        styles.metricValue,
+                        hipAngle < 155 || hipAngle > 195 ? styles.metricValueWarning : styles.metricValueGood,
+                      ]}
+                    >
+                      {hipAngle}°
+                    </Text>
+                  </View>
+                )}
+              </>
+            )}
 
-              {elbowWidthRatio > 0 && (
-                <View style={styles.angleRow}>
-                  <Text style={styles.angleLabel}>ELBOW RATIO:</Text>
+            {selectedExercise === 'Bicep Curls' && (
+              <View style={styles.telemetryMetricRow}>
+                <Text style={styles.metricLabel}>CURL ANGLE</Text>
+                <Text
+                  style={[
+                    styles.metricValue,
+                    elbowAngle > 0 && elbowAngle <= 65
+                      ? styles.metricValuePerfect
+                      : elbowAngle > 0
+                      ? styles.metricValueActive
+                      : styles.metricValueInactive,
+                  ]}
+                >
+                  {elbowAngle > 0 ? `${elbowAngle}°` : '--'}
+                </Text>
+              </View>
+            )}
+
+            {selectedExercise === 'Jumping Jacks' && (
+              <>
+                <View style={styles.telemetryMetricRow}>
+                  <Text style={styles.metricLabel}>ARM SPAN</Text>
                   <Text
                     style={[
-                      styles.angleValue,
-                      elbowWidthRatio > 1.38 ? styles.warningAngleValue : styles.goodAngleValue,
+                      styles.metricValue,
+                      primaryAngle > 0 ? styles.metricValueActive : styles.metricValueInactive,
                     ]}
                   >
-                    {elbowWidthRatio}x
+                    {primaryAngle > 0 ? `${primaryAngle}°` : '--'}
                   </Text>
                 </View>
-              )}
-            </>
-          ) : (
-            <View style={styles.angleRow}>
-              <Text style={styles.angleLabel}>KNEE FLEX:</Text>
-              <Text
-                style={[
-                  styles.angleValue,
-                  kneeAngle === 0
-                    ? styles.inactiveAngleValue
-                    : kneeAngle <= 95
-                    ? styles.perfectAngleValue
-                    : null,
-                ]}
-              >
-                {kneeAngle > 0 ? `${kneeAngle}°` : '0°'}
+                {feetSpanRatio > 0 && (
+                  <View style={styles.telemetryMetricRow}>
+                    <Text style={styles.metricLabel}>FEET RATIO</Text>
+                    <Text style={[styles.metricValue, styles.metricValueGood]}>
+                      {feetSpanRatio}x
+                    </Text>
+                  </View>
+                )}
+              </>
+            )}
+
+            {selectedExercise === 'Mountain Climbers' && (
+              <>
+                <View style={styles.telemetryMetricRow}>
+                  <Text style={styles.metricLabel}>KNEE DRIVE</Text>
+                  <Text
+                    style={[
+                      styles.metricValue,
+                      primaryAngle > 0 && primaryAngle <= 80
+                        ? styles.metricValuePerfect
+                        : primaryAngle > 0
+                        ? styles.metricValueActive
+                        : styles.metricValueInactive,
+                    ]}
+                  >
+                    {primaryAngle > 0 ? `${primaryAngle}°` : '--'}
+                  </Text>
+                </View>
+                {hipAngle > 0 && (
+                  <View style={styles.telemetryMetricRow}>
+                    <Text style={styles.metricLabel}>HIP ANGLE</Text>
+                    <Text
+                      style={[
+                        styles.metricValue,
+                        hipAngle < 150 ? styles.metricValueWarning : styles.metricValueGood,
+                      ]}
+                    >
+                      {hipAngle}°
+                    </Text>
+                  </View>
+                )}
+              </>
+            )}
+
+            {selectedExercise === 'Lunges' && (
+              <View style={styles.telemetryMetricRow}>
+                <Text style={styles.metricLabel}>FRONT KNEE</Text>
+                <Text
+                  style={[
+                    styles.metricValue,
+                    primaryAngle > 0 && primaryAngle <= 100
+                      ? styles.metricValuePerfect
+                      : primaryAngle > 0
+                      ? styles.metricValueActive
+                      : styles.metricValueInactive,
+                  ]}
+                >
+                  {primaryAngle > 0 ? `${primaryAngle}°` : (kneeAngle > 0 ? `${kneeAngle}°` : '--')}
+                </Text>
+              </View>
+            )}
+
+            <View style={styles.telemetryMetricRow}>
+              <Text style={styles.metricLabel}>JOINTS</Text>
+              <Text style={styles.jointCountText}>
+                {jointCount > 0 ? `${jointCount}/33` : 'No person'}
               </Text>
             </View>
-          )}
+          </View>
+        ) : (
+          <View />
+        )}
 
-          <View style={styles.angleRow}>
-            <Text style={styles.angleLabel}>JOINTS:</Text>
-            <Text style={styles.jointCountValue}>
-              {jointCount > 0 ? `${jointCount}/33 Visible` : 'No person'}
+        {/* Right Card: HERO REP COUNTER WIDGET (Prominently visible) */}
+        <View style={styles.heroRepWidget}>
+          <Text style={styles.heroRepLabel}>
+            {selectedExercise === 'Plank' ? 'HOLD TIME' : 'REPETITIONS'}
+          </Text>
+          <View style={styles.heroRepNumberRow}>
+            <Text style={styles.heroRepNumber}>{stats.repCount}</Text>
+            <Text style={styles.heroRepUnit}>
+              {selectedExercise === 'Plank' ? 'SEC' : 'REPS'}
             </Text>
           </View>
-        </View>
-      )}
 
-      {/* 4. Live Recording & Timer Indicator */}
+          <View style={styles.heroRepScoreBadge}>
+            <Ionicons name="sparkles" size={12} color="#10B981" />
+            <Text style={styles.heroRepScoreText}>{stats.formAccuracyScore}% ACCURACY</Text>
+          </View>
+        </View>
+      </View>
+
+      {/* 4. LIVE ACTIVITY & TIMER PILL (Center Floating) */}
       {isWorkoutActive && (
-        <View style={styles.liveIndicatorBar}>
-          <View style={styles.recordingPulse}>
+        <View style={styles.liveTimerPill}>
+          <View style={styles.timerPulseGroup}>
             <View style={[styles.pulseDot, status === 'paused' && styles.pausedPulseDot]} />
-            <Text style={styles.liveText}>
-              {status === 'active' ? 'AI COACH ACTIVE' : 'WORKOUT PAUSED'}
-            </Text>
+            <Text style={styles.timerDurationText}>{formatTime(stats.durationSeconds)}</Text>
           </View>
-          <Text style={styles.timerText}>{formatTime(stats.durationSeconds)}</Text>
+          <View style={styles.timerDivider} />
+          <View style={styles.caloriesGroup}>
+            <Ionicons name="flame" size={14} color="#EF4444" />
+            <Text style={styles.caloriesText}>{stats.caloriesBurned} kcal</Text>
+          </View>
+          <View style={styles.timerDivider} />
+          <View style={styles.perfectRepsGroup}>
+            <Ionicons name="checkmark-done" size={14} color="#10B981" />
+            <Text style={styles.perfectRepsText}>{stats.perfectReps} Perfect</Text>
+          </View>
         </View>
       )}
 
-      {/* 5. Center Framing Guides (when skeleton is off) */}
+      {/* 5. Center Viewfinder Frame Guide (when skeleton is off) */}
       {!showPoseSkeleton && (
         <View style={styles.viewfinderFrame} pointerEvents="none">
           <View style={[styles.cornerMarker, styles.topLeftCorner]} />
           <View style={[styles.cornerMarker, styles.topRightCorner]} />
           <View style={[styles.cornerMarker, styles.bottomLeftCorner]} />
           <View style={[styles.cornerMarker, styles.bottomRightCorner]} />
-        </View>
-      )}
-
-      {/* 6. Big Active Workout Stats Bottom Card */}
-      {isWorkoutActive && (
-        <View style={styles.statsCardContainer}>
-          <View style={styles.statCard}>
-            <Ionicons name="repeat" size={20} color="#38BDF8" />
-            <Text style={styles.statValue}>{stats.repCount}</Text>
-            <Text style={styles.statLabel}>VALID REPS</Text>
-          </View>
-
-          <View style={styles.statDivider} />
-
-          <View style={styles.statCard}>
-            <Ionicons name="sparkles" size={20} color="#10B981" />
-            <Text style={styles.statValue}>{stats.perfectReps}</Text>
-            <Text style={styles.statLabel}>PERFECT REPS</Text>
-          </View>
-
-          <View style={styles.statDivider} />
-
-          <View style={styles.statCard}>
-            <Ionicons name="shield-checkmark" size={20} color="#F59E0B" />
-            <Text style={styles.statValue}>{stats.formAccuracyScore}%</Text>
-            <Text style={styles.statLabel}>FORM SCORE</Text>
-          </View>
-
-          <View style={styles.statDivider} />
-
-          <View style={styles.statCard}>
-            <Ionicons name="flame" size={20} color="#EF4444" />
-            <Text style={styles.statValue}>{stats.caloriesBurned}</Text>
-            <Text style={styles.statLabel}>EST. KCAL</Text>
-          </View>
         </View>
       )}
     </View>
@@ -345,107 +505,95 @@ export const WorkoutHUDOverlay: React.FC<WorkoutHUDOverlayProps> = ({
 const styles = StyleSheet.create({
   overlayContainer: {
     ...StyleSheet.absoluteFill,
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
     paddingTop: 54,
-    paddingBottom: 24,
     paddingHorizontal: 16,
   },
   headerBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    zIndex: 20,
-    gap: 6,
-  },
-  glassIconButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(15, 23, 42, 0.75)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
-  },
-  activeIconButton: {
-    backgroundColor: 'rgba(245, 158, 11, 0.25)',
-    borderColor: '#F59E0B',
-  },
-  activePoseIconButton: {
-    backgroundColor: 'rgba(16, 185, 129, 0.25)',
-    borderColor: '#10B981',
-  },
-  mutedIconButton: {
-    backgroundColor: 'rgba(239, 68, 68, 0.25)',
-    borderColor: '#EF4444',
+    zIndex: 30,
   },
   exerciseBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(15, 23, 42, 0.85)',
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.4)',
-    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 22,
+    borderWidth: 1.5,
+    borderColor: 'rgba(16, 185, 129, 0.45)',
+    gap: 8,
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 4,
   },
   exerciseBadgeText: {
     color: '#F8FAFC',
-    fontSize: 13,
-    fontWeight: '700',
+    fontSize: 15,
+    fontWeight: '800',
+    letterSpacing: 0.3,
   },
-  cameraToggleButton: {
+  quickActionsGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    borderRadius: 20,
-    backgroundColor: 'rgba(15, 23, 42, 0.75)',
-    borderWidth: 1,
-    gap: 4,
+    gap: 8,
   },
-  frontCameraActive: {
-    borderColor: '#38BDF8',
-    backgroundColor: 'rgba(56, 189, 248, 0.15)',
-  },
-  backCameraActive: {
-    borderColor: '#C084FC',
-    backgroundColor: 'rgba(192, 132, 252, 0.15)',
-  },
-  cameraToggleText: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  feedbackBannerContainer: {
-    position: 'absolute',
-    top: 108,
-    left: 16,
-    right: 16,
+  actionIconButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(15, 23, 42, 0.8)',
+    justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 30,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  actionIconButtonActiveGreen: {
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+    borderColor: '#10B981',
+  },
+  actionIconButtonMuted: {
+    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+    borderColor: '#EF4444',
+  },
+  actionIconButtonFrontCam: {
+    borderColor: 'rgba(56, 189, 248, 0.4)',
+    backgroundColor: 'rgba(56, 189, 248, 0.12)',
+  },
+  actionIconButtonBackCam: {
+    borderColor: 'rgba(192, 132, 252, 0.4)',
+    backgroundColor: 'rgba(192, 132, 252, 0.12)',
+  },
+  feedbackBannerWrapper: {
+    marginTop: 12,
+    alignItems: 'center',
+    zIndex: 25,
   },
   feedbackBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 10,
-    borderRadius: 16,
+    borderRadius: 18,
     gap: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,
     shadowRadius: 8,
     elevation: 6,
-    maxWidth: '96%',
+    maxWidth: '98%',
   },
   goodBanner: {
     backgroundColor: 'rgba(15, 23, 42, 0.92)',
     borderWidth: 1.5,
-    borderColor: 'rgba(16, 185, 129, 0.6)',
+    borderColor: 'rgba(16, 185, 129, 0.65)',
   },
   warningBanner: {
-    backgroundColor: 'rgba(45, 14, 14, 0.95)',
+    backgroundColor: 'rgba(45, 14, 14, 0.96)',
     borderWidth: 1.5,
     borderColor: '#EF4444',
   },
@@ -455,7 +603,7 @@ const styles = StyleSheet.create({
     borderColor: '#38BDF8',
   },
   feedbackBannerText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '800',
     letterSpacing: 0.3,
   },
@@ -468,105 +616,213 @@ const styles = StyleSheet.create({
   infoBannerText: {
     color: '#38BDF8',
   },
-  realtimeAngleCard: {
-    position: 'absolute',
-    top: 166,
-    left: 16,
-    backgroundColor: 'rgba(15, 23, 42, 0.92)',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.35)',
-    gap: 4,
-    zIndex: 25,
+  heroTelemetryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginTop: 14,
+    zIndex: 20,
   },
-  angleRow: {
+  telemetryCard: {
+    backgroundColor: 'rgba(15, 23, 42, 0.9)',
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    gap: 5,
+    minWidth: 135,
+  },
+  telemetryHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 10,
+    gap: 6,
+    marginBottom: 2,
   },
-  angleLabel: {
+  telemetryHeaderTitle: {
     color: '#94A3B8',
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 0.4,
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.6,
   },
-  phaseValue: {
-    color: '#38BDF8',
-    fontSize: 11,
+  phasePill: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  phaseIdle: {
+    backgroundColor: 'rgba(100, 116, 139, 0.25)',
+  },
+  phaseReady: {
+    backgroundColor: 'rgba(56, 189, 248, 0.25)',
+  },
+  phaseMoving: {
+    backgroundColor: 'rgba(245, 158, 11, 0.25)',
+  },
+  phaseBottom: {
+    backgroundColor: 'rgba(16, 185, 129, 0.3)',
+  },
+  phasePillText: {
+    color: '#F8FAFC',
+    fontSize: 9,
     fontWeight: '800',
   },
-  angleValue: {
-    color: '#E2E8F0',
+  telemetryMetricRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  metricLabel: {
+    color: '#64748B',
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+  metricValue: {
     fontSize: 12,
     fontWeight: '800',
     fontVariant: ['tabular-nums'],
   },
-  goodAngleValue: {
+  metricValueActive: {
+    color: '#38BDF8',
+  },
+  metricValueGood: {
     color: '#10B981',
   },
-  warningAngleValue: {
+  metricValuePerfect: {
+    color: '#10B981',
+  },
+  metricValueWarning: {
     color: '#EF4444',
   },
-  perfectAngleValue: {
-    color: '#10B981',
-  },
-  inactiveAngleValue: {
+  metricValueInactive: {
     color: '#64748B',
   },
-  jointCountValue: {
+  jointCountText: {
     color: '#CBD5E1',
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
   },
-  liveIndicatorBar: {
+  heroRepWidget: {
+    backgroundColor: 'rgba(15, 23, 42, 0.92)',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: 'rgba(16, 185, 129, 0.45)',
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 8,
+    minWidth: 120,
+  },
+  heroRepLabel: {
+    color: '#94A3B8',
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  heroRepNumberRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 4,
+    marginVertical: 1,
+  },
+  heroRepNumber: {
+    color: '#FFFFFF',
+    fontSize: 38,
+    fontWeight: '900',
+    fontVariant: ['tabular-nums'],
+    letterSpacing: -1,
+  },
+  heroRepUnit: {
+    color: '#10B981',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  heroRepScoreBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    gap: 4,
+  },
+  heroRepScoreText: {
+    color: '#10B981',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  liveTimerPill: {
     alignSelf: 'center',
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: 'rgba(15, 23, 42, 0.85)',
+    backgroundColor: 'rgba(15, 23, 42, 0.88)',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 24,
-    marginTop: 10,
+    marginTop: 14,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    width: '92%',
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    gap: 12,
+    zIndex: 15,
   },
-  recordingPulse: {
+  timerPulseGroup: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
   pulseDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
     backgroundColor: '#10B981',
   },
   pausedPulseDot: {
     backgroundColor: '#F59E0B',
   },
-  liveText: {
-    color: '#E2E8F0',
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 0.8,
-  },
-  timerText: {
-    color: '#10B981',
-    fontSize: 18,
+  timerDurationText: {
+    color: '#F8FAFC',
+    fontSize: 15,
     fontWeight: '800',
     fontVariant: ['tabular-nums'],
   },
+  timerDivider: {
+    width: 1,
+    height: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  caloriesGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  caloriesText: {
+    color: '#CBD5E1',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  perfectRepsGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  perfectRepsText: {
+    color: '#10B981',
+    fontSize: 12,
+    fontWeight: '700',
+  },
   viewfinderFrame: {
     position: 'absolute',
-    top: '25%',
+    top: '30%',
     left: '10%',
     right: '10%',
-    height: '42%',
+    height: '38%',
     justifyContent: 'space-between',
   },
   cornerMarker: {
@@ -602,39 +858,5 @@ const styles = StyleSheet.create({
     borderBottomWidth: 3,
     borderRightWidth: 3,
     borderBottomRightRadius: 6,
-  },
-  statsCardContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-around',
-    backgroundColor: 'rgba(15, 23, 42, 0.88)',
-    borderRadius: 20,
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-    marginBottom: 8,
-  },
-  statCard: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    minWidth: 55,
-  },
-  statValue: {
-    color: '#FFFFFF',
-    fontSize: 17,
-    fontWeight: '800',
-    marginTop: 2,
-  },
-  statLabel: {
-    color: '#94A3B8',
-    fontSize: 9,
-    fontWeight: '700',
-    marginTop: 1,
-  },
-  statDivider: {
-    width: 1,
-    height: 28,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
   },
 });
