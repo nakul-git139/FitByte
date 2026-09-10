@@ -1,16 +1,27 @@
 import { WorkoutSessionRecord } from '../types/workout';
 import { User } from '../types/auth';
 import { FoodLogRecord, DailyNutritionSummary } from '../types/nutrition';
+import { UserFitnessProfile } from '../types/user';
 
 const STORAGE_KEY = 'FITPILOT_WORKOUT_HISTORY_V1';
 const FOOD_STORAGE_KEY = 'FITPILOT_FOOD_LOGS_V1';
 const AUTH_STORAGE_KEY = 'FITPILOT_AUTH_SESSION_V1';
 const LEGACY_AUTH_STORAGE_KEY = 'FITBYTE_AUTH_SESSION_V1';
+const PROFILE_STORAGE_KEY = 'FITPILOT_USER_PROFILE_V1';
 
 // In-memory cache fallback
 let memoryHistory: WorkoutSessionRecord[] = [];
 let memoryFoodLogs: FoodLogRecord[] = [];
 let memoryAuthSession: { token: string; user: User } | null = null;
+let memoryIsProfileSetup = false;
+let memoryUserProfile: UserFitnessProfile = {
+  gender: 'male',
+  age: 24,
+  heightCm: 175,
+  weightKg: 70,
+  fitnessGoal: 'Muscle Building & Hypertrophy',
+  experienceLevel: 'Intermediate',
+};
 
 export interface DashboardStats {
   totalWorkouts: number;
@@ -377,5 +388,66 @@ export class StorageService {
     } catch (e) {
       console.warn('[StorageService] Error clearing food logs:', e);
     }
+  }
+
+  /**
+   * Retrieves the user fitness profile (gender, age, height, weight, goal)
+   */
+  public static async getUserProfile(): Promise<UserFitnessProfile> {
+    try {
+      if (typeof globalThis !== 'undefined' && (globalThis as any).localStorage) {
+        const raw = (globalThis as any).localStorage.getItem(PROFILE_STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && parsed.gender) {
+            memoryUserProfile = parsed;
+            return parsed;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[StorageService] Error reading user profile:', e);
+    }
+
+    return { ...memoryUserProfile };
+  }
+
+  /**
+   * Saves user fitness profile to persistent storage
+   */
+  public static async saveUserProfile(profile: UserFitnessProfile): Promise<void> {
+    try {
+      const updated = {
+        ...profile,
+        updatedAt: new Date().toISOString(),
+      };
+      memoryUserProfile = updated;
+      memoryIsProfileSetup = true;
+
+      if (typeof globalThis !== 'undefined' && (globalThis as any).localStorage) {
+        (globalThis as any).localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(updated));
+      }
+    } catch (e) {
+      console.warn('[StorageService] Error saving user profile:', e);
+      memoryUserProfile = { ...profile };
+      memoryIsProfileSetup = true;
+    }
+  }
+
+  /**
+   * Checks if the user has completed their profile setup
+   */
+  public static async isProfileSetup(): Promise<boolean> {
+    if (memoryIsProfileSetup) return true;
+    try {
+      if (typeof globalThis !== 'undefined' && (globalThis as any).localStorage) {
+        const raw = (globalThis as any).localStorage.getItem(PROFILE_STORAGE_KEY);
+        if (raw) {
+          memoryIsProfileSetup = true;
+          return true;
+        }
+      }
+    } catch {}
+    return false;
   }
 }

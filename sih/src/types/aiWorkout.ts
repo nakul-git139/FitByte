@@ -17,6 +17,7 @@ export interface GeneratedWorkout {
 }
 
 export interface UserProfileData {
+  gender?: string;
   age?: number;
   height?: string;
   weight?: string;

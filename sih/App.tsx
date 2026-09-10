@@ -16,8 +16,10 @@ import { TodaysWorkoutScreen } from './src/components/TodaysWorkoutScreen';
 import { WorkoutReadyScreen } from './src/components/WorkoutReadyScreen';
 import { WorkoutCameraScreen } from './src/components/WorkoutCameraScreen';
 import { FoodScannerScreen } from './src/components/FoodScannerScreen';
+import { UserProfileSetupScreen } from './src/components/UserProfileSetupScreen';
 
 import { AuthService } from './src/services/authService';
+import { StorageService } from './src/services/storageService';
 import { User } from './src/types/auth';
 import { MoodCheckInData } from './src/types/mood';
 import { GeneratedWorkout } from './src/types/aiWorkout';
@@ -32,10 +34,13 @@ type AppView =
   | 'todays-workout'
   | 'workout-ready'
   | 'workout-camera'
-  | 'food-scanner';
+  | 'food-scanner'
+  | 'profile-setup';
 
 export default function App() {
   const [currentView, setCurrentView] = useState<AppView>('splash');
+  const [previousView, setPreviousView] = useState<AppView>('tabs');
+  const [isInitialProfileSetup, setIsInitialProfileSetup] = useState<boolean>(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [activeTab, setActiveTab] = useState<MainTabType>('home');
   const [checkInData, setCheckInData] = useState<MoodCheckInData | null>(null);
@@ -56,9 +61,16 @@ export default function App() {
       });
   }, []);
 
-  const handleSplashFinish = () => {
+  const handleSplashFinish = async () => {
     if (currentUser) {
-      setCurrentView('tabs');
+      const isSetup = await StorageService.isProfileSetup();
+      if (!isSetup) {
+        setPreviousView('tabs');
+        setIsInitialProfileSetup(true);
+        setCurrentView('profile-setup');
+      } else {
+        setCurrentView('tabs');
+      }
     } else {
       setCurrentView('onboarding');
     }
@@ -68,15 +80,31 @@ export default function App() {
     setCurrentView('auth');
   };
 
-  const handleAuthSuccess = (user: User) => {
+  const handleAuthSuccess = async (user: User) => {
     setCurrentUser(user);
-    setCurrentView('tabs');
-    setActiveTab('home');
+    const isSetup = await StorageService.isProfileSetup();
+    if (!isSetup) {
+      setPreviousView('tabs');
+      setIsInitialProfileSetup(true);
+      setCurrentView('profile-setup');
+      setActiveTab('home');
+    } else {
+      setCurrentView('tabs');
+      setActiveTab('home');
+    }
   };
 
-  const handleContinueAsGuest = () => {
-    setCurrentView('tabs');
-    setActiveTab('home');
+  const handleContinueAsGuest = async () => {
+    const isSetup = await StorageService.isProfileSetup();
+    if (!isSetup) {
+      setPreviousView('tabs');
+      setIsInitialProfileSetup(true);
+      setCurrentView('profile-setup');
+      setActiveTab('home');
+    } else {
+      setCurrentView('tabs');
+      setActiveTab('home');
+    }
   };
 
   const handleSignOut = async () => {
@@ -213,6 +241,11 @@ export default function App() {
                 user={currentUser}
                 onSignOut={handleSignOut}
                 onOpenAuth={() => setCurrentView('auth')}
+                onEditProfile={() => {
+                  setPreviousView('tabs');
+                  setIsInitialProfileSetup(false);
+                  setCurrentView('profile-setup');
+                }}
               />
             )}
 
@@ -230,6 +263,28 @@ export default function App() {
             onSubmitCheckIn={handleMoodSubmit}
             onSkip={handleSkipMood}
             onBack={() => handleReturnToTabs()}
+            onOpenProfileSetup={() => {
+              setPreviousView('mood-checkin');
+              setIsInitialProfileSetup(false);
+              setCurrentView('profile-setup');
+            }}
+          />
+        )}
+
+        {currentView === 'profile-setup' && (
+          <UserProfileSetupScreen
+            isInitialSetup={isInitialProfileSetup}
+            onSaveProfile={(_profile) => {
+              setIsInitialProfileSetup(false);
+              setCurrentView(previousView || 'tabs');
+            }}
+            onCancel={
+              isInitialProfileSetup
+                ? undefined
+                : () => {
+                    setCurrentView(previousView || 'tabs');
+                  }
+            }
           />
         )}
 

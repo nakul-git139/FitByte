@@ -6,35 +6,78 @@ import {
 } from '../types/aiWorkout';
 import { MoodCheckInData } from '../types/mood';
 import { getBackendBaseUrl } from '../config/apiConfig';
+import { StorageService } from './storageService';
+
+const GEMINI_MODELS = [
+  'gemini-3.5-flash-lite',
+  'gemini-3.7-flash',
+  'gemini-3.8-flash',
+  'gemini-flash-lite-latest',
+  'gemini-3.5-flash',
+];
+
+function getClientGeminiApiKey(): string {
+  return (
+    process.env.EXPO_PUBLIC_GEMINI_API_KEY ||
+    process.env.GEMINI_API_KEY ||
+    ''
+  );
+}
 
 export class WorkoutAiService {
   /**
-   * Generates a personalized daily workout based on user mood, energy, profile, and past form history
+   * Generates a personalized daily workout based on user mood, energy, biometrics (gender, age, height, weight), and past form history
    */
   public static async generateDailyWorkout(
     checkInData: MoodCheckInData,
     profileData?: UserProfileData
   ): Promise<GeneratedWorkout> {
-    const durationMinutes = checkInData.durationMinutes ?? (profileData?.duration ? parseInt(profileData.duration, 10) : 20) ?? 20;
+    // 1. Fetch user fitness profile from storage if not fully supplied
+    let userProfile = await StorageService.getUserProfile().catch(() => null);
+
+    const gender = profileData?.gender || (userProfile?.gender ? (userProfile.gender === 'female' ? 'Female' : 'Male') : 'Male');
+    const age = profileData?.age ?? userProfile?.age ?? 24;
+    const height = profileData?.height ?? (userProfile?.heightCm ? `${userProfile.heightCm} cm` : '175 cm');
+    const weight = profileData?.weight ?? (userProfile?.weightKg ? `${userProfile.weightKg} kg` : '70 kg');
+    const fitnessGoal = profileData?.fitnessGoal ?? userProfile?.fitnessGoal ?? 'Muscle Building & Hypertrophy';
+    const experienceLevel = profileData?.experienceLevel ?? userProfile?.experienceLevel ?? 'Intermediate';
+    const durationMinutes = checkInData.durationMinutes ?? (profileData?.duration ? parseInt(profileData.duration, 10) : 25) ?? 25;
+
     const payload = {
+      gender,
       mood: checkInData.mood,
       energyLevel: checkInData.energyLevel,
       durationMinutes,
       duration: `${durationMinutes} mins`,
-      age: profileData?.age ?? 25,
-      height: profileData?.height ?? '175 cm',
-      weight: profileData?.weight ?? '70 kg',
-      fitnessGoal: profileData?.fitnessGoal ?? 'General Fitness & Muscle Tone',
-      experienceLevel: profileData?.experienceLevel ?? 'Intermediate',
+      age,
+      height,
+      weight,
+      fitnessGoal,
+      experienceLevel,
       activityLevel: profileData?.activityLevel ?? 'Moderately Active',
       equipment: profileData?.equipment ?? 'Bodyweight / Calisthenics',
       workoutHistory: profileData?.workoutHistory ?? 'Consistent weekly workouts',
       previousFormScores: profileData?.previousFormScores ?? 'Recent average form score: 85%',
     };
 
+    // 2. Try Direct Google Gemini REST API first (fast & reliable from mobile client)
+    try {
+      const apiKey = getClientGeminiApiKey();
+      if (apiKey) {
+        const directWorkout = await this.callDirectGeminiWorkout(payload, apiKey);
+        if (directWorkout && Array.isArray(directWorkout.exercises) && directWorkout.exercises.length > 0) {
+          console.log(`[WorkoutAiService] Live Gemini personalized routine generated for ${gender}, ${age}y, ${height}, ${weight}`);
+          return { ...directWorkout, durationMinutes: directWorkout.durationMinutes || durationMinutes };
+        }
+      }
+    } catch (directErr: any) {
+      console.warn(`[WorkoutAiService] Direct Gemini workout generation failed: ${directErr.message}, trying backend...`);
+    }
+
+    // 3. Try Backend Server Proxy (/api/workout/generate)
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 7000);
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
 
       const response = await fetch(`${getBackendBaseUrl()}/api/workout/generate`, {
         method: 'POST',
@@ -47,16 +90,83 @@ export class WorkoutAiService {
 
       clearTimeout(timeoutId);
 
-      if (!response.ok) {
-        throw new Error(`Server returned status: ${response.status}`);
+      if (response.ok) {
+        const data: GeneratedWorkout = await response.json();
+        return { ...data, durationMinutes: data.durationMinutes || durationMinutes };
       }
-
-      const data: GeneratedWorkout = await response.json();
-      return { ...data, durationMinutes: data.durationMinutes || durationMinutes };
     } catch (err: any) {
-      console.warn(`[WorkoutAiService] Workout generation fallback used (${err.message}).`);
-      return this.getLocalFallbackWorkout(checkInData);
+      console.warn(`[WorkoutAiService] Backend workout proxy error (${err.message}). Using calibrated fallback.`);
     }
+
+    // 4. Calibrated Local Fallback Routine
+    return this.getLocalFallbackWorkout(checkInData);
+  }
+
+  /**
+   * Direct Gemini REST API caller for workouts
+   */
+  private static async callDirectGeminiWorkout(payload: any, apiKey: string): Promise<GeneratedWorkout> {
+    const { gender, age, height, weight, mood, energyLevel, durationMinutes, fitnessGoal, experienceLevel } = payload;
+    const cleanDurationStr = `${durationMinutes} minutes`;
+
+    const systemInstruction = `You are an elite, certified AI strength and conditioning coach and Olympic biomechanist.
+Generate a structured daily workout plan tailored strictly to the user's BIOMETRIC PROFILE (${gender}, ${age} years old, ${height}, ${weight}), mood (${mood}), energy (${energyLevel}/5), and duration (${cleanDurationStr}).
+In the "reason" field, explicitly explain how the routine is biomechanically tailored to their ${gender} physiology, ${age}y age, ${height}/${weight} body leverage, ${mood} mood, and ${fitnessGoal} goal.
+Return ONLY valid JSON matching this schema:
+{
+  "workoutName": "string",
+  "durationMinutes": ${durationMinutes},
+  "difficulty": "light" | "moderate" | "intense" | "hard",
+  "reason": "string",
+  "exercises": [
+    { "name": "string", "sets": number, "reps": number, "restSeconds": number }
+  ]
+}`;
+
+    const promptText = `User Check-in & Biometrics:
+- Gender: ${gender}, Age: ${age} years old
+- Body Stats: Height ${height}, Weight ${weight}
+- Mood: ${mood}, Energy Level: ${energyLevel}/5
+- Duration: ${cleanDurationStr}
+- Fitness Goal: ${fitnessGoal}, Level: ${experienceLevel}
+- Available CV Exercises: Push-ups, Bodyweight Squats, Plank Hold, Lunges, Jumping Jacks, Mountain Climbers, Pull-ups, Bicep Curls.`;
+
+    for (const model of GEMINI_MODELS) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 12000);
+
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: promptText }] }],
+            systemInstruction: { parts: [{ text: systemInstruction }] },
+            generationConfig: {
+              temperature: 0.2,
+              topP: 0.95,
+              responseMimeType: 'application/json',
+            },
+          }),
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!res.ok) continue;
+
+        const data = await res.json();
+        const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!rawText) continue;
+
+        const parsed: GeneratedWorkout = JSON.parse(rawText);
+        parsed.isFallback = false;
+        return parsed;
+      } catch {}
+    }
+
+    throw new Error('All direct Gemini models failed');
   }
 
   /**

@@ -41,11 +41,11 @@ loadEnv();
  */
 
 const GEMINI_MODELS = [
-  'gemini-3.5-flash',
   'gemini-3.5-flash-lite',
   'gemini-3.7-flash',
   'gemini-3.8-flash',
   'gemini-flash-lite-latest',
+  'gemini-3.5-flash',
   'gemini-flash-latest',
 ];
 
@@ -117,16 +117,17 @@ async function callGeminiApi(contents, systemInstruction) {
 }
 
 /**
- * 1. Daily Workout Generation from Mood & Energy
+ * 1. Daily Workout Generation from Mood, Energy & Biometrics (Gender, Age, Height, Weight)
  */
 async function generateWorkout(params) {
   const {
+    gender = 'Male',
     mood = 'Good',
     energyLevel = 3,
-    age = 25,
+    age = 24,
     height = '175 cm',
     weight = '70 kg',
-    fitnessGoal = 'General Fitness & Muscle Tone',
+    fitnessGoal = 'Muscle Building & Hypertrophy',
     experienceLevel = 'Intermediate',
     activityLevel = 'Moderately Active',
     equipment = 'Bodyweight / Calisthenics',
@@ -151,38 +152,43 @@ async function generateWorkout(params) {
   durationMinutes = Math.max(5, Math.min(120, durationMinutes));
   const cleanDurationStr = `${durationMinutes} minutes`;
 
-  const systemInstruction = `You are an elite, certified AI strength and conditioning coach and biomechanist.
-Your goal is to generate a structured, personalized daily workout plan tailored strictly to the user's current mood, energy level (1-5), and EXACT available workout duration (${cleanDurationStr}).
+  const systemInstruction = `You are an elite, certified AI strength and conditioning coach and Olympic biomechanist.
+Your goal is to generate a structured, personalized daily workout plan tailored strictly to the user's BIOMETRIC PROFILE (${gender}, ${age} years old, ${height}, ${weight}), their current mood (${mood}), energy level (1-5), and EXACT available workout duration (${cleanDurationStr}).
 
-CRITICAL WORKOUT DESIGN RULES:
-1. REALISTIC TIME CALCULATION:
+CRITICAL BIOMECHANICAL & PHYSIOLOGICAL ADAPTATION RULES:
+1. GENDER & VOLUME CALIBRATION:
+   - Tailor kinetic chain loading, muscle recovery ratios, and core/lower/upper volume according to user gender (${gender}).
+2. AGE & JOINT IMPACT:
+   - For younger athletes (<30 yrs): Optimize progressive overload, power, and high-cadence reps.
+   - For mature athletes (30-45 yrs): Balance hypertrophy with rotational core stability and joint protection.
+   - For senior/older athletes (>45 yrs): Prioritize controlled tempo, joint-friendly angles, spinal alignment, and generous recovery.
+3. HEIGHT & WEIGHT (BIOMECHANICS):
+   - User body stats: Height ${height}, Weight ${weight}.
+   - Adjust bodyweight leverage demands (e.g. lever length in squats/lunges, resistance torque in push-ups and planks) to ensure safe range of motion.
+4. REALISTIC TIME CALCULATION:
    - The user has EXACTLY ${durationMinutes} minutes for this workout.
-   - You MUST design the routine (sets × (reps × 3.5s + restSeconds)) to be completed within ${durationMinutes} minutes.
+   - You MUST design the routine (sets × (reps × 3.5s + restSeconds)) to fit within ${durationMinutes} minutes.
    - For short workouts (<=10 mins): 2-3 exercises, 2 sets each, 8-10 reps (or 15-25s hold), 30-45s rest.
    - For medium workouts (11-20 mins): 3-4 exercises, 2-3 sets each, 8-12 reps, 35-45s rest.
    - For longer workouts (21-45 mins): 4-6 exercises, 3-4 sets each, 10-15 reps, 45-60s rest.
    - For 45+ mins: 5-7 exercises, 4 sets each, 12-18 reps, 60s rest.
-
-2. REALISTIC ENERGY LEVEL SCALING (1-5):
-   - Energy 1-2 (Low / Tired): Focus on active recovery & joint mobility. 6-10 reps, 2 sets, generous rest (45-60s).
-   - Energy 3 (Moderate / Steady): Balanced conditioning. 10-12 reps, 2-3 sets, 35-45s rest.
-   - Energy 4-5 (High / Motivated / Peak): High intensity & power. 12-18 reps, 3-4 sets, 30-45s rest.
-
-3. SUPPORTED EXERCISES:
+5. SUPPORTED EXERCISES:
    - Choose exercises primarily from the app's computer-vision tracking library:
      "Push-ups", "Bodyweight Squats", "Plank Hold", "Pull-ups", "Bicep Curls", "Jumping Jacks", "Mountain Climbers", "Lunges".
-
-4. SCHEMA RULE:
+6. SCHEMA RULE:
    - In your JSON response, "durationMinutes" MUST be ${durationMinutes}.
+   - In the "reason" field, explicitly mention how the routine is specifically tailored to their gender (${gender}), age (${age}y), height (${height}), weight (${weight}), and fitness goal (${fitnessGoal}).
    - Return ONLY valid JSON with no markdown formatting.`;
 
   const prompt = `User Profile & Check-in:
+- Gender: ${gender}
+- Age: ${age} years old
+- Height: ${height}, Weight: ${weight}
 - Mood: ${mood}
 - Energy Level (1-5): ${energyLevel}
 - Exact Available Duration: ${cleanDurationStr} (${durationMinutes} minutes)
-- Fitness Goal: ${fitnessGoal}
+- Primary Fitness Goal: ${fitnessGoal}
 - Experience Level: ${experienceLevel}
-- Age: ${age}, Height: ${height}, Weight: ${weight}
 - Available Equipment: ${equipment}
 - Recent Workout History: ${workoutHistory}
 - Previous Form Scores: ${previousFormScores}
@@ -192,7 +198,7 @@ Generate a workout in this exact JSON schema:
   "workoutName": "string",
   "durationMinutes": ${durationMinutes},
   "difficulty": "light" | "moderate" | "intense" | "hard",
-  "reason": "string explaining how the volume, reps, and exercise selection match the user's ${mood} mood, ${energyLevel}/5 energy, and ${durationMinutes} min time limit",
+  "reason": "string explaining how the volume, reps, and exercise selection match the user's ${gender} physiology, ${age}y age, ${height}/${weight} body leverage, ${mood} mood, ${energyLevel}/5 energy, and ${durationMinutes} min time limit",
   "exercises": [
     {
       "name": "string (e.g. Bodyweight Squats, Push-ups, Plank Hold, Lunges, Jumping Jacks, Mountain Climbers, Pull-ups, Bicep Curls)",

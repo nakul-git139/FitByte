@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { MoodType, MoodOption, MoodCheckInData } from '../types/mood';
 import { GeneratedWorkout } from '../types/aiWorkout';
+import { UserFitnessProfile } from '../types/user';
 import { WorkoutAiService } from '../services/workoutAiService';
 import { StorageService } from '../services/storageService';
 import { Theme } from '../config/theme';
@@ -43,6 +44,7 @@ interface DailyMoodCheckInScreenProps {
   onSubmitCheckIn: (data: MoodCheckInData, workout?: GeneratedWorkout) => void;
   onSkip?: () => void;
   onBack?: () => void;
+  onOpenProfileSetup?: () => void;
 }
 
 export const DailyMoodCheckInScreen: React.FC<DailyMoodCheckInScreenProps> = ({
@@ -51,6 +53,7 @@ export const DailyMoodCheckInScreen: React.FC<DailyMoodCheckInScreenProps> = ({
   onSubmitCheckIn,
   onSkip,
   onBack,
+  onOpenProfileSetup,
 }) => {
   const [selectedMood, setSelectedMood] = useState<MoodType>(initialMood);
   const [energyLevel, setEnergyLevel] = useState<number>(initialEnergy);
@@ -59,6 +62,7 @@ export const DailyMoodCheckInScreen: React.FC<DailyMoodCheckInScreenProps> = ({
   const [customInputText, setCustomInputText] = useState<string>('25');
   const [showMoreMoods, setShowMoreMoods] = useState<boolean>(false);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
+  const [userProfile, setUserProfile] = useState<UserFitnessProfile | null>(null);
   const [historySummary, setHistorySummary] = useState<{
     averageFormScore: number;
     totalSessions: number;
@@ -70,6 +74,12 @@ export const DailyMoodCheckInScreen: React.FC<DailyMoodCheckInScreenProps> = ({
     StorageService.getRecentFormSummary()
       .then((summary) => setHistorySummary(summary))
       .catch((e) => console.warn('[DailyMoodCheckInScreen] Error reading summary:', e));
+
+    StorageService.getUserProfile()
+      .then((p) => {
+        if (p) setUserProfile(p);
+      })
+      .catch((e) => console.warn('[DailyMoodCheckInScreen] Error reading profile:', e));
   }, []);
 
   const handleSelectMood = (mood: MoodType) => {
@@ -153,6 +163,12 @@ export const DailyMoodCheckInScreen: React.FC<DailyMoodCheckInScreenProps> = ({
 
     try {
       const generated = await WorkoutAiService.generateDailyWorkout(checkInData, {
+        gender: userProfile?.gender,
+        age: userProfile?.age,
+        height: userProfile?.heightCm ? `${userProfile.heightCm} cm` : undefined,
+        weight: userProfile?.weightKg ? `${userProfile.weightKg} kg` : undefined,
+        fitnessGoal: userProfile?.fitnessGoal,
+        experienceLevel: userProfile?.experienceLevel,
         workoutHistory: historySummary?.historySummaryText || undefined,
         previousFormScores: historySummary?.averageFormScore ? `Average form score: ${historySummary.averageFormScore}%` : undefined,
       });
@@ -162,12 +178,14 @@ export const DailyMoodCheckInScreen: React.FC<DailyMoodCheckInScreenProps> = ({
     } catch (e) {
       console.warn('[DailyMoodCheckInScreen] Error generating workout:', e);
       setIsGenerating(false);
-      // Fallback structured plan
+      // Fallback structured plan calibrated with biometrics
+      const genderLabel = userProfile?.gender === 'female' ? "Women's" : "Men's";
+      const goalDesc = userProfile?.fitnessGoal ? ` • ${userProfile.fitnessGoal.split(' ')[0]}` : '';
       onSubmitCheckIn(checkInData, {
-        workoutName: `${selectedMood} Energy Flow`,
+        workoutName: `${genderLabel} ${selectedMood} Flow${goalDesc}`,
         durationMinutes: safeDurationMinutes,
         difficulty: energyLevel >= 4 ? 'intense' : energyLevel >= 3 ? 'moderate' : 'light',
-        reason: `Personalized ${safeDurationMinutes}-min routine matching your ${selectedMood.toLowerCase()} state and energy level ${energyLevel}/5.`,
+        reason: `Personalized ${safeDurationMinutes}-min routine calibrated for ${userProfile?.gender || 'athlete'} (${userProfile?.age || 24}y, ${userProfile?.weightKg || 70}kg) matching your ${selectedMood.toLowerCase()} state and energy level ${energyLevel}/5.`,
         exercises: [
           { name: 'Push-ups', sets: 3, reps: energyLevel >= 4 ? 12 : 10, restSeconds: 45 },
           { name: 'Bodyweight Squats', sets: 3, reps: energyLevel >= 4 ? 15 : 12, restSeconds: 45 },
@@ -207,6 +225,43 @@ export const DailyMoodCheckInScreen: React.FC<DailyMoodCheckInScreenProps> = ({
             Your check-in helps FitPilot recommend a better workout for you.
           </Text>
         </View>
+
+        {/* Biometrics Calibration Badge */}
+        {userProfile && (
+          <TouchableOpacity
+            style={styles.biometricBadgeCard}
+            onPress={onOpenProfileSetup}
+            activeOpacity={0.8}
+          >
+            <View style={styles.biometricBadgeLeft}>
+              <View style={styles.biometricIconBox}>
+                <Ionicons
+                  name={userProfile.gender === 'female' ? 'female' : 'male'}
+                  size={16}
+                  color={Theme.colors.primaryGreen}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={styles.biometricTitle}>
+                    {userProfile.gender === 'female' ? 'Female (Women)' : 'Male (Men)'}, {userProfile.age}y
+                  </Text>
+                  <View style={styles.biometricGoalDot} />
+                  <Text style={styles.biometricSub}>
+                    {userProfile.heightCm}cm · {userProfile.weightKg}kg
+                  </Text>
+                </View>
+                <Text style={styles.biometricGoalText} numberOfLines={1}>
+                  Target: {userProfile.fitnessGoal}
+                </Text>
+              </View>
+            </View>
+            <View style={styles.biometricEditPill}>
+              <Ionicons name="options-outline" size={13} color={Theme.colors.primaryGreen} />
+              <Text style={styles.biometricEditText}>Change</Text>
+            </View>
+          </TouchableOpacity>
+        )}
 
         {/* 1. Mood Cards (😊 Great, 😐 Okay, 😴 Tired) */}
         <View style={styles.moodGrid}>
@@ -753,5 +808,68 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: Theme.typography.sizes.md,
     fontWeight: '700',
+  },
+  biometricBadgeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: Theme.colors.surface,
+    padding: Theme.spacing.base,
+    borderRadius: Theme.borderRadius.xl,
+    borderWidth: 1,
+    borderColor: Theme.colors.borderSubtle,
+    marginBottom: Theme.spacing.md,
+    ...Theme.shadows.soft,
+  },
+  biometricBadgeLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  biometricIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Theme.colors.lightGreen,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  biometricTitle: {
+    fontSize: Theme.typography.sizes.sm,
+    fontWeight: '800',
+    color: Theme.colors.textPrimary,
+  },
+  biometricGoalDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: Theme.colors.textMuted,
+  },
+  biometricSub: {
+    fontSize: 11,
+    color: Theme.colors.textSecondary,
+    fontWeight: '600',
+  },
+  biometricGoalText: {
+    fontSize: 10,
+    color: Theme.colors.primaryGreenDark,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  biometricEditPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: Theme.colors.lightGreen,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: Theme.borderRadius.full,
+    marginLeft: 8,
+  },
+  biometricEditText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Theme.colors.primaryGreenDark,
   },
 });

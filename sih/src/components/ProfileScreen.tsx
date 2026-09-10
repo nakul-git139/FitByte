@@ -15,6 +15,7 @@ import * as Haptics from 'expo-haptics';
 import { SpeechService } from '../engine/core/SpeechService';
 import { StorageService, DashboardStats } from '../services/storageService';
 import { User } from '../types/auth';
+import { UserFitnessProfile } from '../types/user';
 import { FitPilotLogo } from './FitPilotLogo';
 import { Theme } from '../config/theme';
 
@@ -23,6 +24,7 @@ interface ProfileScreenProps {
   onClearHistoryComplete?: () => void;
   onSignOut?: () => void;
   onOpenAuth?: () => void;
+  onEditProfile?: () => void;
 }
 
 export const ProfileScreen: React.FC<ProfileScreenProps> = ({
@@ -30,10 +32,19 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   onClearHistoryComplete,
   onSignOut,
   onOpenAuth,
+  onEditProfile,
 }) => {
   const [voiceFeedback, setVoiceFeedback] = useState<boolean>(true);
   const [hapticFeedback, setHapticFeedback] = useState<boolean>(true);
   const [showAboutModal, setShowAboutModal] = useState<boolean>(false);
+  const [fitnessProfile, setFitnessProfile] = useState<UserFitnessProfile>({
+    gender: 'male',
+    age: 24,
+    heightCm: 175,
+    weightKg: 70,
+    fitnessGoal: 'Muscle Building & Hypertrophy',
+    experienceLevel: 'Intermediate',
+  });
   const [stats, setStats] = useState<DashboardStats>({
     totalWorkouts: 0,
     totalReps: 0,
@@ -50,6 +61,12 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         setStats(data);
       })
       .catch((e) => console.warn('[ProfileScreen] Error loading stats:', e));
+
+    StorageService.getUserProfile()
+      .then((p) => {
+        if (p) setFitnessProfile(p);
+      })
+      .catch((e) => console.warn('[ProfileScreen] Error loading profile:', e));
   }, []);
 
   const handleToggleVoice = (value: boolean) => {
@@ -88,6 +105,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
   const displayName = user?.name ? user.name : 'FitPilot Athlete';
 
+  // Calculate BMI
+  const heightM = fitnessProfile.heightCm / 100;
+  const bmi = heightM > 0 ? (fitnessProfile.weightKg / (heightM * heightM)).toFixed(1) : '22.9';
+
   return (
     <SafeAreaView style={styles.safeContainer} edges={['top', 'left', 'right']}>
       <ScrollView
@@ -98,7 +119,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         <View style={styles.avatarSection}>
           <View style={styles.avatarCircle}>
             <Ionicons
-              name={user?.authProvider === 'google' ? 'logo-google' : 'person'}
+              name={user?.authProvider === 'google' ? 'logo-google' : (fitnessProfile.gender === 'female' ? 'woman' : 'man')}
               size={36}
               color={Theme.colors.primaryGreen}
             />
@@ -111,7 +132,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           )}
         </View>
 
-        {/* 2. Stat Pills Row (4 Day streak | 12 Workouts | 91% Avg form) */}
+        {/* 2. Stat Pills Row (Day streak | Workouts | Avg form) */}
         <View style={styles.statPillsRow}>
           <View style={styles.statPillCard}>
             <Text style={styles.statPillValue}>{stats.dayStreak}</Text>
@@ -131,7 +152,69 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           </View>
         </View>
 
-        {/* 3. Settings Menu Section */}
+        {/* 3. Fitness Profile & Biometrics Card */}
+        <View style={styles.biometricsCard}>
+          <View style={styles.biometricsHeader}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <View style={styles.biometricsIconPill}>
+                <Ionicons
+                  name={fitnessProfile.gender === 'female' ? 'female' : 'male'}
+                  size={16}
+                  color={Theme.colors.primaryGreen}
+                />
+              </View>
+              <Text style={styles.biometricsTitle}>Biometrics & AI Calibration</Text>
+            </View>
+
+            {onEditProfile && (
+              <TouchableOpacity
+                style={styles.editProfileButton}
+                onPress={onEditProfile}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="create-outline" size={14} color={Theme.colors.primaryGreen} />
+                <Text style={styles.editProfileButtonText}>Edit</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <View style={styles.biometricsGrid}>
+            <View style={styles.biometricGridItem}>
+              <Text style={styles.biometricGridLabel}>Gender</Text>
+              <Text style={styles.biometricGridValue}>
+                {fitnessProfile.gender === 'female' ? 'Female' : 'Male'}
+              </Text>
+            </View>
+
+            <View style={styles.biometricGridItem}>
+              <Text style={styles.biometricGridLabel}>Age</Text>
+              <Text style={styles.biometricGridValue}>{fitnessProfile.age} yrs</Text>
+            </View>
+
+            <View style={styles.biometricGridItem}>
+              <Text style={styles.biometricGridLabel}>Height</Text>
+              <Text style={styles.biometricGridValue}>{fitnessProfile.heightCm} cm</Text>
+            </View>
+
+            <View style={styles.biometricGridItem}>
+              <Text style={styles.biometricGridLabel}>Weight</Text>
+              <Text style={styles.biometricGridValue}>{fitnessProfile.weightKg} kg</Text>
+            </View>
+          </View>
+
+          <View style={styles.biometricFooterRow}>
+            <View style={styles.goalTagBadge}>
+              <Ionicons name="trophy-outline" size={12} color={Theme.colors.primaryGreen} />
+              <Text style={styles.goalTagText}>{fitnessProfile.fitnessGoal}</Text>
+            </View>
+
+            <View style={styles.bmiTagBadge}>
+              <Text style={styles.bmiTagText}>BMI {bmi}</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* 4. Settings Menu Section */}
         <View style={styles.menuCard}>
           {/* Workout Preferences */}
           <TouchableOpacity
@@ -325,6 +408,103 @@ const styles = StyleSheet.create({
     color: Theme.colors.textSecondary,
     marginTop: 2,
     fontWeight: '600',
+  },
+  biometricsCard: {
+    backgroundColor: Theme.colors.surface,
+    padding: Theme.spacing.base,
+    borderRadius: Theme.borderRadius.xl,
+    borderWidth: 1,
+    borderColor: Theme.colors.borderSubtle,
+    marginBottom: Theme.spacing.xl,
+    ...Theme.shadows.soft,
+  },
+  biometricsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Theme.spacing.md,
+  },
+  biometricsIconPill: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: Theme.colors.lightGreen,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  biometricsTitle: {
+    fontSize: Theme.typography.sizes.sm,
+    fontWeight: '800',
+    color: Theme.colors.textPrimary,
+  },
+  editProfileButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: Theme.colors.lightGreen,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: Theme.borderRadius.full,
+  },
+  editProfileButtonText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Theme.colors.primaryGreenDark,
+  },
+  biometricsGrid: {
+    flexDirection: 'row',
+    backgroundColor: Theme.colors.surfaceSecondary,
+    borderRadius: Theme.borderRadius.lg,
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+    marginBottom: 10,
+  },
+  biometricGridItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  biometricGridLabel: {
+    fontSize: 10,
+    color: Theme.colors.textMuted,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  biometricGridValue: {
+    fontSize: Theme.typography.sizes.sm,
+    fontWeight: '800',
+    color: Theme.colors.textPrimary,
+  },
+  biometricFooterRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 8,
+  },
+  goalTagBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: Theme.colors.surfaceSecondary,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: Theme.borderRadius.full,
+    flex: 1,
+  },
+  goalTagText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: Theme.colors.textPrimary,
+  },
+  bmiTagBadge: {
+    backgroundColor: Theme.colors.lightGreen,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: Theme.borderRadius.full,
+  },
+  bmiTagText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Theme.colors.primaryGreenDark,
   },
   menuCard: {
     backgroundColor: Theme.colors.surface,
