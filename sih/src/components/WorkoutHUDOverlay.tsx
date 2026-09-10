@@ -499,9 +499,9 @@ export const WorkoutHUDOverlay: React.FC<WorkoutHUDOverlayProps> = ({
         {(() => {
           const goodReps = stats.perfectReps ?? stats.goodReps ?? 0;
           const badReps = stats.badReps ?? Math.max(0, stats.repCount - goodReps);
-          const target = targetReps || stats.targetReps || (selectedExercise === 'Plank' ? 30 : 12);
+          const isIsometric = (selectedExercise || '').toLowerCase().includes('plank');
+          const target = targetReps || stats.targetReps || (isIsometric ? 30 : 10);
           const formScore = stats.formAccuracyScore ?? 100;
-          const isIsometric = selectedExercise === 'Plank';
 
           return (
             <View style={styles.heroRepWidget}>
@@ -510,7 +510,9 @@ export const WorkoutHUDOverlay: React.FC<WorkoutHUDOverlayProps> = ({
               </Text>
               
               <View style={styles.heroRepNumberRow}>
-                <Text style={styles.heroRepNumber}>{stats.repCount}</Text>
+                <Text style={styles.heroRepNumber}>
+                  {stats.repCount}{isIsometric ? 's' : ''}
+                </Text>
                 <Text style={styles.heroRepTargetDivider}>/</Text>
                 <Text style={styles.heroRepTargetNumber}>
                   {target}{isIsometric ? 's' : ''}
@@ -521,12 +523,16 @@ export const WorkoutHUDOverlay: React.FC<WorkoutHUDOverlayProps> = ({
               <View style={styles.heroRepStatsRow}>
                 <View style={styles.goodRepPill}>
                   <Ionicons name="checkmark-circle" size={11} color="#10B981" />
-                  <Text style={styles.goodRepText}>Good: {goodReps}</Text>
+                  <Text style={styles.goodRepText}>
+                    {isIsometric ? `Clean: ${goodReps}s` : `Good: ${goodReps}`}
+                  </Text>
                 </View>
-                <View style={styles.badRepPill}>
-                  <Ionicons name="close-circle" size={11} color="#EF4444" />
-                  <Text style={styles.badRepText}>Bad: {badReps}</Text>
-                </View>
+                {!isIsometric && (
+                  <View style={styles.badRepPill}>
+                    <Ionicons name="close-circle" size={11} color="#EF4444" />
+                    <Text style={styles.badRepText}>Bad: {badReps}</Text>
+                  </View>
+                )}
               </View>
 
               {/* Form Score Badge */}

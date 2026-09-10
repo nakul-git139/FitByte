@@ -28,6 +28,7 @@ export default function App() {
   const [checkInData, setCheckInData] = useState<MoodCheckInData | null>(null);
   const [generatedWorkout, setGeneratedWorkout] = useState<GeneratedWorkout | null>(null);
   const [selectedExercise, setSelectedExercise] = useState<string>('Pushups');
+  const [selectedTargetReps, setSelectedTargetReps] = useState<number | undefined>(undefined);
 
   // Check stored auth session on startup
   useEffect(() => {
@@ -67,16 +68,20 @@ export default function App() {
   };
 
   // Triggered from Home "Start Workout" button or Choose Workout "Continue"
-  const handleStartDailyFlow = (exerciseName?: string) => {
+  const handleStartDailyFlow = (exerciseName?: string, targetReps?: number) => {
     if (exerciseName) {
       setSelectedExercise(exerciseName);
+    }
+    if (targetReps) {
+      setSelectedTargetReps(targetReps);
     }
     setCurrentView('mood-checkin');
   };
 
   // Quick Play directly launches workout camera with chosen exercise
-  const handleQuickLaunchExercise = (exerciseName: string) => {
+  const handleQuickLaunchExercise = (exerciseName: string, targetReps?: number) => {
     setSelectedExercise(exerciseName);
+    setSelectedTargetReps(targetReps);
     setCurrentView('workout-camera');
   };
 
@@ -87,6 +92,7 @@ export default function App() {
       setGeneratedWorkout(workout);
       if (workout.exercises && workout.exercises.length > 0) {
         setSelectedExercise(workout.exercises[0].name);
+        setSelectedTargetReps(workout.exercises[0].reps);
       }
     }
     setCurrentView('todays-workout');
@@ -97,9 +103,12 @@ export default function App() {
   };
 
   // Start workout from Today's Workout screen
-  const handleStartFromWorkoutPlan = (exerciseName?: string) => {
+  const handleStartFromWorkoutPlan = (exerciseName?: string, targetReps?: number) => {
     if (exerciseName) {
       setSelectedExercise(exerciseName);
+    }
+    if (targetReps) {
+      setSelectedTargetReps(targetReps);
     }
     setCurrentView('workout-camera');
   };
@@ -210,6 +219,7 @@ export default function App() {
         {currentView === 'workout-camera' && (
           <WorkoutCameraScreen
             initialExercise={selectedExercise}
+            initialTargetReps={selectedTargetReps}
             initialWorkoutPlan={generatedWorkout}
             checkInData={checkInData}
             onExit={handleExitWorkoutCamera}

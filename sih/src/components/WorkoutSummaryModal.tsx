@@ -3,9 +3,20 @@ import { StyleSheet, Text, View, Modal, TouchableOpacity, ScrollView } from 'rea
 import { Ionicons } from '@expo/vector-icons';
 import { WorkoutSummary } from '../types/workout';
 
+interface NextExerciseInfo {
+  name: string;
+  sets?: number;
+  reps?: number;
+  restSeconds?: number;
+}
+
 interface WorkoutSummaryModalProps {
   visible: boolean;
   summary: WorkoutSummary | null;
+  nextExercise?: NextExerciseInfo | null;
+  currentStepIndex?: number;
+  totalStepsCount?: number;
+  onStartNext?: () => void;
   onSave: () => void;
   onDismiss: () => void;
 }
@@ -13,6 +24,10 @@ interface WorkoutSummaryModalProps {
 export const WorkoutSummaryModal: React.FC<WorkoutSummaryModalProps> = ({
   visible,
   summary,
+  nextExercise,
+  currentStepIndex,
+  totalStepsCount,
+  onStartNext,
   onSave,
   onDismiss,
 }) => {
@@ -27,6 +42,22 @@ export const WorkoutSummaryModal: React.FC<WorkoutSummaryModalProps> = ({
 
   const goodReps = summary.goodReps ?? summary.perfectReps;
   const badReps = summary.badReps ?? Math.max(0, summary.repCount - summary.perfectReps);
+
+  // Fallback next exercise resolution to guarantee Next is always available
+  const fallbackNext = (() => {
+    const norm = (summary.workoutType || summary.workoutName || '').toLowerCase().replace(/[^a-z]/g, '');
+    if (norm.includes('bicep') || norm.includes('curl')) return { name: 'Bodyweight Squats', sets: 3, reps: 12, restSeconds: 45 };
+    if (norm.includes('squat')) return { name: 'Plank Hold', sets: 3, reps: 30, restSeconds: 45 };
+    if (norm.includes('pushup')) return { name: 'Bodyweight Squats', sets: 3, reps: 12, restSeconds: 45 };
+    if (norm.includes('plank')) return { name: 'Lunges', sets: 3, reps: 10, restSeconds: 45 };
+    if (norm.includes('lunge')) return { name: 'Push-ups', sets: 3, reps: 10, restSeconds: 45 };
+    if (norm.includes('jumping') || norm.includes('jack')) return { name: 'Mountain Climbers', sets: 3, reps: 20, restSeconds: 30 };
+    if (norm.includes('mountain') || norm.includes('climber')) return { name: 'Plank Hold', sets: 3, reps: 30, restSeconds: 45 };
+    if (norm.includes('pullup')) return { name: 'Push-ups', sets: 3, reps: 10, restSeconds: 45 };
+    return { name: 'Bodyweight Squats', sets: 3, reps: 12, restSeconds: 45 };
+  })();
+
+  const effectiveNext = nextExercise || fallbackNext;
 
   return (
     <Modal
@@ -50,16 +81,33 @@ export const WorkoutSummaryModal: React.FC<WorkoutSummaryModalProps> = ({
               <Text style={styles.subtitle}>{summary.workoutName || summary.workoutType}</Text>
             </View>
 
-            {/* Computer Vision & Reps Stats Grid */}
-            <View style={styles.statsGrid}>
-              <View style={styles.gridItem}>
-                <Ionicons name="repeat-outline" size={20} color="#38BDF8" />
-                <Text style={styles.gridValue}>{summary.repCount}</Text>
-                <Text style={styles.gridLabel}>Total Reps</Text>
-                <Text style={styles.gridSubLabel}>
-                  {goodReps} Good • {badReps} Bad
-                </Text>
+            {/* Routine Step Progress Banner */}
+            {totalStepsCount !== undefined && totalStepsCount > 1 && (
+              <View style={styles.routineProgressBanner}>
+                <View style={styles.routineStepPill}>
+                  <Ionicons name="sparkles" size={12} color="#10B981" />
+                  <Text style={styles.routineStepText}>
+                    ROUTINE STEP {currentStepIndex || 1} OF {totalStepsCount} COMPLETED
+                  </Text>
+                </View>
               </View>
+            )}
+
+            {/* Computer Vision & Reps Stats Grid */}
+            {(() => {
+              const isIsometric = (summary.workoutName || summary.workoutType || '').toLowerCase().includes('plank');
+              return (
+                <View style={styles.statsGrid}>
+                  <View style={styles.gridItem}>
+                    <Ionicons name={isIsometric ? "timer-outline" : "repeat-outline"} size={20} color="#38BDF8" />
+                    <Text style={styles.gridValue}>{summary.repCount}{isIsometric ? 's' : ''}</Text>
+                    <Text style={styles.gridLabel}>{isIsometric ? 'Hold Time' : 'Total Reps'}</Text>
+                    <Text style={styles.gridSubLabel}>
+                      {isIsometric
+                        ? `${summary.perfectReps || summary.repCount}s Clean Form`
+                        : `${goodReps} Good • ${badReps} Bad`}
+                    </Text>
+                  </View>
 
               <View style={styles.gridItem}>
                 <Ionicons name="checkmark-done-circle-outline" size={20} color="#10B981" />
@@ -77,13 +125,15 @@ export const WorkoutSummaryModal: React.FC<WorkoutSummaryModalProps> = ({
                 <Text style={styles.gridSubLabel}>Total: {formatDuration(summary.durationSeconds)}</Text>
               </View>
 
-              <View style={styles.gridItem}>
-                <Ionicons name="flame-outline" size={20} color="#EF4444" />
-                <Text style={styles.gridValue}>{summary.caloriesBurned}</Text>
-                <Text style={styles.gridLabel}>Est. Calories</Text>
-                <Text style={styles.gridSubLabel}>METs Powered</Text>
+                <View style={styles.gridItem}>
+                  <Ionicons name="flame-outline" size={20} color="#EF4444" />
+                  <Text style={styles.gridValue}>{summary.caloriesBurned}</Text>
+                  <Text style={styles.gridLabel}>Est. Calories</Text>
+                  <Text style={styles.gridSubLabel}>METs Powered</Text>
+                </View>
               </View>
-            </View>
+            );
+          })()}
 
             {/* Gemini AI Coach Post-Workout Analysis Card */}
             {summary.aiAnalysis && (
@@ -138,15 +188,61 @@ export const WorkoutSummaryModal: React.FC<WorkoutSummaryModalProps> = ({
               </View>
             )}
 
-            {/* Buttons */}
+            {/* Next Recommended Workout in Routine Card */}
+            {effectiveNext && onStartNext && (
+              <View style={styles.nextExerciseCard}>
+                <View style={styles.nextExerciseHeader}>
+                  <View style={styles.nextExercisePill}>
+                    <Ionicons name="sparkles" size={12} color="#10B981" />
+                    <Text style={styles.nextExercisePillText}>UP NEXT IN TODAY'S PLAN</Text>
+                  </View>
+                </View>
+
+                <View style={styles.nextExerciseDetailsRow}>
+                  <View style={styles.nextExerciseIconWrap}>
+                    <Ionicons
+                      name={effectiveNext.name.toLowerCase().includes('plank') ? 'timer-outline' : 'barbell-outline'}
+                      size={24}
+                      color="#10B981"
+                    />
+                  </View>
+                  <View style={styles.nextExerciseTextWrap}>
+                    <Text style={styles.nextExerciseName}>{effectiveNext.name}</Text>
+                    <Text style={styles.nextExerciseMeta}>
+                      {effectiveNext.sets ? `${effectiveNext.sets} Sets × ` : ''}
+                      {effectiveNext.name.toLowerCase().includes('plank')
+                        ? `${effectiveNext.reps || 30}s Hold`
+                        : `${effectiveNext.reps || 10} Reps`}
+                      {effectiveNext.restSeconds ? ` • ${effectiveNext.restSeconds}s Rest` : ''}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            )}
+
+            {/* Action Buttons */}
             <View style={styles.buttonContainer}>
+              {onStartNext && effectiveNext && (
+                <TouchableOpacity
+                  style={styles.primaryNextButton}
+                  activeOpacity={0.85}
+                  onPress={onStartNext}
+                >
+                  <Ionicons name="play" size={20} color="#FFFFFF" />
+                  <Text style={styles.primaryNextButtonText}>
+                    Start Next: {effectiveNext.name} ({effectiveNext.name.toLowerCase().includes('plank') ? `${effectiveNext.reps || 30}s` : `${effectiveNext.reps || 10} Reps`})
+                  </Text>
+                  <Ionicons name="arrow-forward" size={20} color="#FFFFFF" />
+                </TouchableOpacity>
+              )}
+
               <TouchableOpacity
-                style={styles.saveButton}
+                style={styles.saveOutlineButton}
                 activeOpacity={0.8}
                 onPress={onSave}
               >
-                <Ionicons name="checkmark-done" size={20} color="#FFFFFF" />
-                <Text style={styles.saveButtonText}>Save Workout to History</Text>
+                <Ionicons name="bookmark-outline" size={18} color="#10B981" />
+                <Text style={styles.saveOutlineButtonText}>Save Workout to History</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -328,6 +424,151 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     flex: 1,
   },
+  routineProgressBanner: {
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  routineStepPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+  },
+  routineStepText: {
+    color: '#10B981',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+  },
+  nextExerciseCard: {
+    width: '100%',
+    backgroundColor: 'rgba(16, 185, 129, 0.08)',
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: 1.5,
+    borderColor: 'rgba(16, 185, 129, 0.35)',
+    marginBottom: 16,
+  },
+  nextExerciseHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  nextExercisePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  nextExercisePillText: {
+    color: '#10B981',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+  },
+  nextExerciseDetailsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 14,
+  },
+  nextExerciseIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+  },
+  nextExerciseTextWrap: {
+    flex: 1,
+  },
+  nextExerciseName: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#F8FAFC',
+    marginBottom: 2,
+  },
+  nextExerciseMeta: {
+    fontSize: 12,
+    color: '#94A3B8',
+    fontWeight: '600',
+  },
+  startNextButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#10B981',
+    borderRadius: 14,
+    paddingVertical: 14,
+    gap: 8,
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  startNextButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  completedRoutineCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    width: '100%',
+    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1.5,
+    borderColor: 'rgba(245, 158, 11, 0.3)',
+    marginBottom: 16,
+  },
+  completedRoutineTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#F59E0B',
+    marginBottom: 2,
+  },
+  completedRoutineSub: {
+    fontSize: 11,
+    color: '#CBD5E1',
+    lineHeight: 15,
+  },
+  primaryNextButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#10B981',
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    gap: 8,
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  primaryNextButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
   buttonContainer: {
     width: '100%',
     gap: 10,
@@ -346,6 +587,22 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '800',
+  },
+  saveOutlineButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(16, 185, 129, 0.08)',
+    borderRadius: 14,
+    paddingVertical: 13,
+    gap: 8,
+    borderWidth: 1.5,
+    borderColor: 'rgba(16, 185, 129, 0.4)',
+  },
+  saveOutlineButtonText: {
+    color: '#10B981',
+    fontSize: 14,
+    fontWeight: '700',
   },
   dismissButton: {
     alignItems: 'center',

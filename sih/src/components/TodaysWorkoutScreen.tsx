@@ -15,7 +15,7 @@ import { GeneratedWorkout } from '../types/aiWorkout';
 interface TodaysWorkoutScreenProps {
   checkInData: MoodCheckInData | null;
   generatedWorkout?: GeneratedWorkout | null;
-  onStartWorkout: (initialExercise?: string) => void;
+  onStartWorkout: (initialExercise?: string, targetReps?: number) => void;
   onEditCheckIn: () => void;
   onBack?: () => void;
 }
@@ -47,8 +47,10 @@ export const TodaysWorkoutScreen: React.FC<TodaysWorkoutScreenProps> = ({
     } catch {
       // Fallback
     }
-    const chosenExercise = workout.exercises[selectedExerciseIndex]?.name || 'Pushups';
-    onStartWorkout(chosenExercise);
+    const chosenObj = workout.exercises[selectedExerciseIndex];
+    const chosenExercise = chosenObj?.name || 'Pushups';
+    const chosenReps = chosenObj?.reps;
+    onStartWorkout(chosenExercise, chosenReps);
   };
 
   const handleEdit = () => {
@@ -126,7 +128,7 @@ export const TodaysWorkoutScreen: React.FC<TodaysWorkoutScreenProps> = ({
                 {checkInData?.emoji || '😊'}
               </Text>
               <View>
-                <Text style={styles.summaryItemLabel}>CURRENT MOOD</Text>
+                <Text style={styles.summaryItemLabel}>MOOD</Text>
                 <Text style={styles.summaryItemValue}>
                   {checkInData?.mood || 'Great'}
                 </Text>
@@ -139,9 +141,22 @@ export const TodaysWorkoutScreen: React.FC<TodaysWorkoutScreenProps> = ({
             <View style={styles.summaryItem}>
               <Text style={styles.summaryItemEmoji}>⚡</Text>
               <View>
-                <Text style={styles.summaryItemLabel}>ENERGY LEVEL</Text>
+                <Text style={styles.summaryItemLabel}>ENERGY</Text>
                 <Text style={styles.summaryItemValue}>
                   {checkInData?.energyLevel ? `${checkInData.energyLevel}/5` : '3/5'}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.summaryDivider} />
+
+            {/* Duration Item */}
+            <View style={styles.summaryItem}>
+              <Text style={styles.summaryItemEmoji}>⏱️</Text>
+              <View>
+                <Text style={styles.summaryItemLabel}>TIME</Text>
+                <Text style={styles.summaryItemValue}>
+                  {checkInData?.durationMinutes ? `${checkInData.durationMinutes}m` : `${workout.durationMinutes}m`}
                 </Text>
               </View>
             </View>
@@ -195,7 +210,7 @@ export const TodaysWorkoutScreen: React.FC<TodaysWorkoutScreenProps> = ({
                       {item.name}
                     </Text>
                     <Text style={styles.exerciseMeta}>
-                      {item.sets} Sets × {item.reps} Reps • {item.restSeconds}s Rest
+                      {item.sets} Sets × {item.reps}{item.name.toLowerCase().includes('plank') || item.name.toLowerCase().includes('hold') ? 's Hold' : ' Reps'} • {item.restSeconds}s Rest
                     </Text>
                   </View>
                   <View style={styles.cameraPill}>

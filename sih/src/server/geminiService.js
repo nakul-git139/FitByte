@@ -108,39 +108,73 @@ async function generateWorkout(params) {
     fitnessGoal = 'General Fitness & Muscle Tone',
     experienceLevel = 'Intermediate',
     activityLevel = 'Moderately Active',
-    duration = '20-30 mins',
     equipment = 'Bodyweight / Calisthenics',
     workoutHistory = 'Consistent weekly workouts',
     previousFormScores = 'Recent average form score: 85%',
   } = params || {};
 
-  const systemInstruction = `You are an elite, certified AI strength and conditioning coach.
-Generate a structured, personalized daily workout plan tailored specifically to the user's current mood, energy level, physical profile, and recent biomechanics form history.
-Return ONLY valid JSON with no markdown formatting.`;
+  // Robustly extract and sanitize duration
+  let durationMinutes = parseInt(params.durationMinutes, 10);
+  if (isNaN(durationMinutes) || durationMinutes <= 0) {
+    if (params.duration) {
+      const match = String(params.duration).match(/\d+/);
+      durationMinutes = match ? parseInt(match[0], 10) : 0;
+    }
+    if (!durationMinutes || durationMinutes <= 0) {
+      const isLow = energyLevel <= 2 || mood === 'Low Energy' || mood === 'Tired';
+      const isHigh = energyLevel >= 4 || mood === 'Motivated' || mood === 'Great';
+      durationMinutes = isLow ? 15 : isHigh ? 30 : 20;
+    }
+  }
+  // Clamp between 5 and 120 minutes
+  durationMinutes = Math.max(5, Math.min(120, durationMinutes));
+  const cleanDurationStr = `${durationMinutes} minutes`;
+
+  const systemInstruction = `You are an elite, certified AI strength and conditioning coach and biomechanist.
+Your goal is to generate a structured, personalized daily workout plan tailored strictly to the user's current mood, energy level (1-5), and EXACT available workout duration (${cleanDurationStr}).
+
+CRITICAL WORKOUT DESIGN RULES:
+1. REALISTIC TIME CALCULATION:
+   - The user has EXACTLY ${durationMinutes} minutes for this workout.
+   - You MUST design the routine (sets × (reps × 3.5s + restSeconds)) to be completed within ${durationMinutes} minutes.
+   - For short workouts (<=10 mins): 2-3 exercises, 2 sets each, 8-10 reps (or 15-25s hold), 30-45s rest.
+   - For medium workouts (11-20 mins): 3-4 exercises, 2-3 sets each, 8-12 reps, 35-45s rest.
+   - For longer workouts (21-45 mins): 4-6 exercises, 3-4 sets each, 10-15 reps, 45-60s rest.
+   - For 45+ mins: 5-7 exercises, 4 sets each, 12-18 reps, 60s rest.
+
+2. REALISTIC ENERGY LEVEL SCALING (1-5):
+   - Energy 1-2 (Low / Tired): Focus on active recovery & joint mobility. 6-10 reps, 2 sets, generous rest (45-60s).
+   - Energy 3 (Moderate / Steady): Balanced conditioning. 10-12 reps, 2-3 sets, 35-45s rest.
+   - Energy 4-5 (High / Motivated / Peak): High intensity & power. 12-18 reps, 3-4 sets, 30-45s rest.
+
+3. SUPPORTED EXERCISES:
+   - Choose exercises primarily from the app's computer-vision tracking library:
+     "Push-ups", "Bodyweight Squats", "Plank Hold", "Pull-ups", "Bicep Curls", "Jumping Jacks", "Mountain Climbers", "Lunges".
+
+4. SCHEMA RULE:
+   - In your JSON response, "durationMinutes" MUST be ${durationMinutes}.
+   - Return ONLY valid JSON with no markdown formatting.`;
 
   const prompt = `User Profile & Check-in:
 - Mood: ${mood}
 - Energy Level (1-5): ${energyLevel}
-- Age: ${age}
-- Height: ${height}
-- Weight: ${weight}
+- Exact Available Duration: ${cleanDurationStr} (${durationMinutes} minutes)
 - Fitness Goal: ${fitnessGoal}
 - Experience Level: ${experienceLevel}
-- Activity Level: ${activityLevel}
-- Desired Duration: ${duration}
+- Age: ${age}, Height: ${height}, Weight: ${weight}
 - Available Equipment: ${equipment}
-- Recent Workout History & Progress: ${workoutHistory}
-- Previous Form Scores & Biomechanics Notes: ${previousFormScores}
+- Recent Workout History: ${workoutHistory}
+- Previous Form Scores: ${previousFormScores}
 
 Generate a workout in this exact JSON schema:
 {
   "workoutName": "string",
-  "durationMinutes": number,
+  "durationMinutes": ${durationMinutes},
   "difficulty": "light" | "moderate" | "intense" | "hard",
-  "reason": "string explaining how this workout matches the mood and energy",
+  "reason": "string explaining how the volume, reps, and exercise selection match the user's ${mood} mood, ${energyLevel}/5 energy, and ${durationMinutes} min time limit",
   "exercises": [
     {
-      "name": "string",
+      "name": "string (e.g. Bodyweight Squats, Push-ups, Plank Hold, Lunges, Jumping Jacks, Mountain Climbers, Pull-ups, Bicep Curls)",
       "sets": number,
       "reps": number,
       "restSeconds": number
@@ -151,10 +185,10 @@ Generate a workout in this exact JSON schema:
   try {
     const contents = [{ role: 'user', parts: [{ text: prompt }] }];
     const result = await callGeminiApi(contents, systemInstruction);
-    return { ...result, isFallback: false };
+    return { ...result, durationMinutes, isFallback: false };
   } catch (err) {
     console.warn(`[Gemini Service] Workout generation fallback used: ${err.message}`);
-    return getFallbackWorkout(mood, energyLevel);
+    return getFallbackWorkout(mood, energyLevel, durationMinutes);
   }
 }
 
@@ -222,54 +256,245 @@ Analyze this keyframe and return JSON in this exact structure:
 }
 
 /**
- * Smart Local Fallbacks
+ * Smart Local Fallbacks with Realistic Time and Energy Scaling
  */
-function getFallbackWorkout(mood, energy) {
+function getFallbackWorkout(mood, energy, duration) {
   const isLow = energy <= 2 || mood === 'Low Energy' || mood === 'Tired';
   const isHigh = energy >= 4 || mood === 'Motivated' || mood === 'Great';
+  const parsedDuration = parseInt(duration, 10) || (isLow ? 15 : isHigh ? 30 : 20);
+  const difficulty = isLow ? 'light' : isHigh ? 'intense' : 'moderate';
 
+  if (parsedDuration <= 10) {
+    if (isLow) {
+      return {
+        workoutName: `${parsedDuration}-Min Gentle Recovery Flow`,
+        durationMinutes: parsedDuration,
+        difficulty: 'light',
+        reason: `Quick ${parsedDuration}-minute session tailored for low energy (${energy}/5). Uses gentle volume and 45s recovery intervals to re-energize without fatigue.`,
+        exercises: [
+          { name: 'Bodyweight Squats', sets: 2, reps: 8, restSeconds: 45 },
+          { name: 'Push-ups', sets: 2, reps: 6, restSeconds: 45 },
+          { name: 'Plank Hold', sets: 2, reps: 15, restSeconds: 45 },
+        ],
+        isFallback: true,
+      };
+    }
+    if (isHigh) {
+      return {
+        workoutName: `${parsedDuration}-Min High-Intensity Sprint`,
+        durationMinutes: parsedDuration,
+        difficulty: 'intense',
+        reason: `High-tempo ${parsedDuration}-minute blast matching your ${energy}/5 energy. Short rest periods and explosive bodyweight movements maximize calorie burn.`,
+        exercises: [
+          { name: 'Bodyweight Squats', sets: 3, reps: 12, restSeconds: 30 },
+          { name: 'Push-ups', sets: 3, reps: 10, restSeconds: 30 },
+          { name: 'Jumping Jacks', sets: 2, reps: 20, restSeconds: 30 },
+        ],
+        isFallback: true,
+      };
+    }
+    return {
+      workoutName: `${parsedDuration}-Min Express Activation`,
+      durationMinutes: parsedDuration,
+      difficulty: 'moderate',
+      reason: `Balanced ${parsedDuration}-minute full-body activation fitting your ${energy}/5 energy level.`,
+      exercises: [
+        { name: 'Bodyweight Squats', sets: 2, reps: 10, restSeconds: 35 },
+        { name: 'Push-ups', sets: 2, reps: 8, restSeconds: 35 },
+        { name: 'Plank Hold', sets: 2, reps: 25, restSeconds: 35 },
+      ],
+      isFallback: true,
+    };
+  }
+
+  if (parsedDuration <= 15) {
+    if (isLow) {
+      return {
+        workoutName: `${parsedDuration}-Min Low-Impact Mobility Flow`,
+        durationMinutes: parsedDuration,
+        difficulty: 'light',
+        reason: `${parsedDuration}-minute recovery session for ${mood.toLowerCase()} mood and energy ${energy}/5. Generous rest and joint-friendly bodyweight reps.`,
+        exercises: [
+          { name: 'Bodyweight Squats', sets: 2, reps: 8, restSeconds: 60 },
+          { name: 'Push-ups', sets: 2, reps: 6, restSeconds: 60 },
+          { name: 'Plank Hold', sets: 2, reps: 20, restSeconds: 60 },
+        ],
+        isFallback: true,
+      };
+    }
+    if (isHigh) {
+      return {
+        workoutName: `${parsedDuration}-Min Power Conditioning`,
+        durationMinutes: parsedDuration,
+        difficulty: 'intense',
+        reason: `${parsedDuration} minutes of athletic power training calibrated for peak energy ${energy}/5.`,
+        exercises: [
+          { name: 'Bodyweight Squats', sets: 3, reps: 15, restSeconds: 35 },
+          { name: 'Push-ups', sets: 3, reps: 12, restSeconds: 35 },
+          { name: 'Mountain Climbers', sets: 3, reps: 20, restSeconds: 30 },
+          { name: 'Plank Hold', sets: 3, reps: 35, restSeconds: 35 },
+        ],
+        isFallback: true,
+      };
+    }
+    return {
+      workoutName: `${parsedDuration}-Min Core & Strength Pulse`,
+      durationMinutes: parsedDuration,
+      difficulty: 'moderate',
+      reason: `${parsedDuration}-minute conditioning routine with steady 45s rest intervals for balanced ${energy}/5 energy.`,
+      exercises: [
+        { name: 'Bodyweight Squats', sets: 3, reps: 10, restSeconds: 45 },
+        { name: 'Push-ups', sets: 3, reps: 8, restSeconds: 45 },
+        { name: 'Lunges', sets: 2, reps: 8, restSeconds: 45 },
+        { name: 'Plank Hold', sets: 2, reps: 30, restSeconds: 45 },
+      ],
+      isFallback: true,
+    };
+  }
+
+  if (parsedDuration <= 20) {
+    if (isLow) {
+      return {
+        workoutName: `${parsedDuration}-Min Recovery & Mobility`,
+        durationMinutes: parsedDuration,
+        difficulty: 'light',
+        reason: `${parsedDuration}-minute recovery routine matching ${mood.toLowerCase()} mood and ${energy}/5 energy. Controlled tempo with 60s recovery periods.`,
+        exercises: [
+          { name: 'Bodyweight Squats', sets: 2, reps: 10, restSeconds: 60 },
+          { name: 'Push-ups', sets: 2, reps: 8, restSeconds: 60 },
+          { name: 'Lunges', sets: 2, reps: 8, restSeconds: 60 },
+          { name: 'Plank Hold', sets: 2, reps: 20, restSeconds: 60 },
+        ],
+        isFallback: true,
+      };
+    }
+    if (isHigh) {
+      return {
+        workoutName: `${parsedDuration}-Min High Energy Full Body Power`,
+        durationMinutes: parsedDuration,
+        difficulty: 'intense',
+        reason: `${parsedDuration} minutes of high-output power training for peak ${energy}/5 energy. 4 sets with explosive bodyweight reps.`,
+        exercises: [
+          { name: 'Bodyweight Squats', sets: 4, reps: 15, restSeconds: 40 },
+          { name: 'Push-ups', sets: 4, reps: 12, restSeconds: 40 },
+          { name: 'Jumping Jacks', sets: 3, reps: 25, restSeconds: 30 },
+          { name: 'Mountain Climbers', sets: 3, reps: 20, restSeconds: 30 },
+          { name: 'Plank Hold', sets: 3, reps: 45, restSeconds: 40 },
+        ],
+        isFallback: true,
+      };
+    }
+    return {
+      workoutName: `${parsedDuration}-Min Balanced Full Body Conditioning`,
+      durationMinutes: parsedDuration,
+      difficulty: 'moderate',
+      reason: `${parsedDuration}-minute structured conditioning plan with 3 sets across core movement patterns for steady ${energy}/5 energy.`,
+      exercises: [
+        { name: 'Bodyweight Squats', sets: 3, reps: 12, restSeconds: 45 },
+        { name: 'Push-ups', sets: 3, reps: 10, restSeconds: 45 },
+        { name: 'Lunges', sets: 3, reps: 10, restSeconds: 45 },
+        { name: 'Plank Hold', sets: 3, reps: 30, restSeconds: 45 },
+      ],
+      isFallback: true,
+    };
+  }
+
+  if (parsedDuration <= 30) {
+    if (isLow) {
+      return {
+        workoutName: `${parsedDuration}-Min Extended Recovery & Posture`,
+        durationMinutes: parsedDuration,
+        difficulty: 'light',
+        reason: `${parsedDuration}-minute steady-state mobility and joint alignment routine for ${energy}/5 energy level.`,
+        exercises: [
+          { name: 'Bodyweight Squats', sets: 3, reps: 10, restSeconds: 60 },
+          { name: 'Push-ups', sets: 3, reps: 8, restSeconds: 60 },
+          { name: 'Lunges', sets: 3, reps: 8, restSeconds: 60 },
+          { name: 'Plank Hold', sets: 3, reps: 25, restSeconds: 60 },
+        ],
+        isFallback: true,
+      };
+    }
+    if (isHigh) {
+      return {
+        workoutName: `${parsedDuration}-Min Athletic Hypertrophy & Power`,
+        durationMinutes: parsedDuration,
+        difficulty: 'intense',
+        reason: `${parsedDuration}-minute complete athletic volume session matching peak ${energy}/5 energy with full progressive overload.`,
+        exercises: [
+          { name: 'Bodyweight Squats', sets: 4, reps: 15, restSeconds: 45 },
+          { name: 'Push-ups', sets: 4, reps: 14, restSeconds: 45 },
+          { name: 'Lunges', sets: 4, reps: 12, restSeconds: 45 },
+          { name: 'Mountain Climbers', sets: 3, reps: 25, restSeconds: 30 },
+          { name: 'Jumping Jacks', sets: 3, reps: 30, restSeconds: 30 },
+          { name: 'Plank Hold', sets: 3, reps: 45, restSeconds: 45 },
+        ],
+        isFallback: true,
+      };
+    }
+    return {
+      workoutName: `${parsedDuration}-Min Complete Strength & Conditioning`,
+      durationMinutes: parsedDuration,
+      difficulty: 'moderate',
+      reason: `${parsedDuration}-minute full body workout delivering 5 balanced exercise blocks tailored for ${energy}/5 energy.`,
+      exercises: [
+        { name: 'Bodyweight Squats', sets: 3, reps: 12, restSeconds: 45 },
+        { name: 'Push-ups', sets: 3, reps: 12, restSeconds: 45 },
+        { name: 'Lunges', sets: 3, reps: 12, restSeconds: 45 },
+        { name: 'Bicep Curls', sets: 3, reps: 10, restSeconds: 45 },
+        { name: 'Plank Hold', sets: 3, reps: 35, restSeconds: 45 },
+      ],
+      isFallback: true,
+    };
+  }
+
+  // 31+ Mins (Custom long sessions e.g. 45m, 60m, 90m)
   if (isLow) {
     return {
-      workoutName: 'Low Energy Recovery & Mobility',
-      durationMinutes: 20,
+      workoutName: `${parsedDuration}-Min Extended Full Body Rejuvenation`,
+      durationMinutes: parsedDuration,
       difficulty: 'light',
-      reason: `You reported ${mood.toLowerCase()} and energy level ${energy}/5, so this workout uses lighter volume, controlled tempo, and longer recovery intervals.`,
+      reason: `${parsedDuration}-minute low-stress rejuvenation session with 75s rest periods, joint mobility, and low fatigue volume.`,
       exercises: [
-        { name: 'Bodyweight Squats', sets: 2, reps: 8, restSeconds: 60 },
-        { name: 'Incline / Standard Push-ups', sets: 2, reps: 6, restSeconds: 60 },
-        { name: 'Plank Hold', sets: 2, reps: 20, restSeconds: 60 },
+        { name: 'Bodyweight Squats', sets: 3, reps: 10, restSeconds: 75 },
+        { name: 'Push-ups', sets: 3, reps: 8, restSeconds: 75 },
+        { name: 'Lunges', sets: 3, reps: 10, restSeconds: 75 },
+        { name: 'Bicep Curls', sets: 3, reps: 10, restSeconds: 60 },
+        { name: 'Plank Hold', sets: 3, reps: 30, restSeconds: 60 },
       ],
       isFallback: true,
     };
   }
-
   if (isHigh) {
     return {
-      workoutName: 'High Energy Full Body Power',
-      durationMinutes: 30,
+      workoutName: `${parsedDuration}-Min Total Body Mastery`,
+      durationMinutes: parsedDuration,
       difficulty: 'intense',
-      reason: `You reported ${mood.toLowerCase()} with peak energy ${energy}/5! This workout maximizes muscle recruitment with higher volume and explosive movements.`,
+      reason: `${parsedDuration}-minute comprehensive workout maximizing total volume across 7 movements for peak ${energy}/5 energy.`,
       exercises: [
-        { name: 'Bodyweight Squats', sets: 4, reps: 15, restSeconds: 45 },
-        { name: 'Push-ups', sets: 4, reps: 12, restSeconds: 45 },
-        { name: 'Jumping Jacks', sets: 3, reps: 25, restSeconds: 30 },
-        { name: 'Mountain Climbers', sets: 3, reps: 20, restSeconds: 30 },
-        { name: 'Plank Hold', sets: 3, reps: 45, restSeconds: 45 },
+        { name: 'Bodyweight Squats', sets: 4, reps: 18, restSeconds: 45 },
+        { name: 'Push-ups', sets: 4, reps: 15, restSeconds: 45 },
+        { name: 'Lunges', sets: 4, reps: 14, restSeconds: 45 },
+        { name: 'Pull-ups', sets: 4, reps: 8, restSeconds: 60 },
+        { name: 'Mountain Climbers', sets: 4, reps: 25, restSeconds: 30 },
+        { name: 'Jumping Jacks', sets: 3, reps: 30, restSeconds: 30 },
+        { name: 'Plank Hold', sets: 4, reps: 45, restSeconds: 45 },
       ],
       isFallback: true,
     };
   }
-
   return {
-    workoutName: 'Balanced Full Body Conditioning',
-    durationMinutes: 25,
+    workoutName: `${parsedDuration}-Min Extended Conditioning Matrix`,
+    durationMinutes: parsedDuration,
     difficulty: 'moderate',
-    reason: `You reported feeling ${mood.toLowerCase()} with steady energy ${energy}/5. This balanced session delivers steady conditioning and joint mobility.`,
+    reason: `${parsedDuration}-minute complete workout with 4 sets across major kinetic chains for solid ${energy}/5 energy.`,
     exercises: [
-      { name: 'Bodyweight Squats', sets: 3, reps: 12, restSeconds: 45 },
-      { name: 'Push-ups', sets: 3, reps: 10, restSeconds: 45 },
-      { name: 'Lunges', sets: 3, reps: 10, restSeconds: 45 },
-      { name: 'Plank Hold', sets: 3, reps: 30, restSeconds: 45 },
+      { name: 'Bodyweight Squats', sets: 4, reps: 12, restSeconds: 60 },
+      { name: 'Push-ups', sets: 4, reps: 12, restSeconds: 60 },
+      { name: 'Lunges', sets: 4, reps: 12, restSeconds: 60 },
+      { name: 'Bicep Curls', sets: 3, reps: 10, restSeconds: 60 },
+      { name: 'Mountain Climbers', sets: 3, reps: 20, restSeconds: 45 },
+      { name: 'Plank Hold', sets: 4, reps: 35, restSeconds: 45 },
     ],
     isFallback: true,
   };

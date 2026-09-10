@@ -148,7 +148,9 @@ export const ProgressScreen: React.FC<ProgressScreenProps> = ({
 
                   <View style={styles.recentStatsRight}>
                     <Text style={styles.recentRepsText}>
-                      {session.actualReps ?? 0} reps
+                      {(session.workoutType || session.workoutName || '').toLowerCase().includes('plank')
+                        ? `${session.actualReps ?? 0}s hold`
+                        : `${session.actualReps ?? 0} reps`}
                     </Text>
                     <Text style={styles.recentFormText}>
                       {session.formAccuracyScore ?? 100}% form

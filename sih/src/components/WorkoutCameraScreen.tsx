@@ -34,6 +34,7 @@ const EXERCISE_OPTIONS = [
 
 interface WorkoutCameraScreenProps {
   initialExercise?: string;
+  initialTargetReps?: number;
   initialWorkoutPlan?: GeneratedWorkout | null;
   checkInData?: MoodCheckInData | null;
   onExit?: () => void;
@@ -41,6 +42,7 @@ interface WorkoutCameraScreenProps {
 
 export const WorkoutCameraScreen: React.FC<WorkoutCameraScreenProps> = ({
   initialExercise,
+  initialTargetReps,
   initialWorkoutPlan,
   checkInData,
   onExit,
@@ -50,13 +52,88 @@ export const WorkoutCameraScreen: React.FC<WorkoutCameraScreenProps> = ({
   const [showPoseSkeleton, setShowPoseSkeleton] = useState<boolean>(true);
   const [isMuted, setIsMuted] = useState<boolean>(false);
 
+  // Helper to dynamically extract target reps from the mood-generated AI plan
+  const getDynamicTargetReps = (exerciseName: string): number => {
+    if (initialTargetReps && initialExercise === exerciseName) {
+      return initialTargetReps;
+    }
+    if (initialWorkoutPlan?.exercises && initialWorkoutPlan.exercises.length > 0) {
+      const normalizedQuery = exerciseName.toLowerCase().replace(/[^a-z]/g, '');
+      const found = initialWorkoutPlan.exercises.find((ex) => {
+        const normName = ex.name.toLowerCase().replace(/[^a-z]/g, '');
+        return normName.includes(normalizedQuery) || normalizedQuery.includes(normName);
+      });
+      if (found && typeof found.reps === 'number' && found.reps > 0) {
+        return found.reps;
+      }
+    }
+    if (exerciseName === 'Plank') return 30;
+    if (exerciseName === 'Jumping Jacks' || exerciseName === 'Mountain Climbers') return 20;
+    return 10;
+  };
+
+  const initialExName = initialExercise || initialWorkoutPlan?.exercises?.[0]?.name || 'Pushups';
+  const initialTarget = initialTargetReps || getDynamicTargetReps(initialExName);
+
   const [workoutStatus, setWorkoutStatus] = useState<WorkoutStatus>('idle');
-  const [selectedExercise, setSelectedExercise] = useState<string>(() => {
-    if (initialExercise) return initialExercise;
-    if (initialWorkoutPlan?.exercises?.[0]?.name) return initialWorkoutPlan.exercises[0].name;
-    return 'Pushups';
-  });
+  const [selectedExercise, setSelectedExercise] = useState<string>(initialExName);
   const [showExercisePicker, setShowExercisePicker] = useState<boolean>(false);
+
+  // Helper to resolve active workout routine from Gemini or fallback plan
+  const activePlan: GeneratedWorkout = initialWorkoutPlan || {
+    workoutName: 'Balanced Full Body Conditioning',
+    durationMinutes: 20,
+    difficulty: 'moderate' as const,
+    reason: 'Personalized daily workout routine',
+    exercises: [
+      { name: 'Push-ups', sets: 3, reps: 10, restSeconds: 45 },
+      { name: 'Bodyweight Squats', sets: 3, reps: 12, restSeconds: 45 },
+      { name: 'Plank Hold', sets: 3, reps: 30, restSeconds: 45 },
+    ],
+  };
+
+  const normalizeExName = (name: string) => (name || '').toLowerCase().replace(/[^a-z]/g, '');
+
+  const NEXT_RECOMMENDED_MAP: Record<string, { name: string; sets: number; reps: number; restSeconds: number }> = {
+    pushups: { name: 'Bodyweight Squats', sets: 3, reps: 12, restSeconds: 45 },
+    squats: { name: 'Plank Hold', sets: 3, reps: 30, restSeconds: 45 },
+    bicepcurls: { name: 'Bodyweight Squats', sets: 3, reps: 12, restSeconds: 45 },
+    bicep: { name: 'Bodyweight Squats', sets: 3, reps: 12, restSeconds: 45 },
+    curl: { name: 'Bodyweight Squats', sets: 3, reps: 12, restSeconds: 45 },
+    plank: { name: 'Lunges', sets: 3, reps: 10, restSeconds: 45 },
+    lunges: { name: 'Push-ups', sets: 3, reps: 10, restSeconds: 45 },
+    jumpingjacks: { name: 'Mountain Climbers', sets: 3, reps: 20, restSeconds: 30 },
+    mountainclimbers: { name: 'Plank Hold', sets: 3, reps: 30, restSeconds: 45 },
+    pullups: { name: 'Push-ups', sets: 3, reps: 10, restSeconds: 45 },
+  };
+
+  const getFallbackNextExercise = (exerciseName: string) => {
+    const query = normalizeExName(exerciseName);
+    for (const key of Object.keys(NEXT_RECOMMENDED_MAP)) {
+      if (query.includes(key) || key.includes(query)) {
+        return NEXT_RECOMMENDED_MAP[key];
+      }
+    }
+    return { name: 'Bodyweight Squats', sets: 3, reps: 12, restSeconds: 45 };
+  };
+
+  const getExerciseIndexInPlan = (exerciseName: string): number => {
+    if (!activePlan.exercises || activePlan.exercises.length === 0) return -1;
+    const query = normalizeExName(exerciseName);
+    return activePlan.exercises.findIndex((ex) => {
+      const norm = normalizeExName(ex.name);
+      return norm.includes(query) || query.includes(norm);
+    });
+  };
+
+  const currentExerciseIndex = getExerciseIndexInPlan(selectedExercise);
+  const totalExercisesCount = activePlan.exercises ? activePlan.exercises.length : 1;
+  const currentStepNumber = currentExerciseIndex >= 0 ? currentExerciseIndex + 1 : 1;
+  const planNextExercise =
+    activePlan.exercises && currentExerciseIndex >= 0 && currentExerciseIndex + 1 < totalExercisesCount
+      ? activePlan.exercises[currentExerciseIndex + 1]
+      : null;
+  const nextExercise = planNextExercise || getFallbackNextExercise(selectedExercise);
 
   // Live real-time computer vision metrics from MediaPipe & Form Engine
   const [liveKneeAngle, setLiveKneeAngle] = useState<number>(0);
@@ -81,6 +158,7 @@ export const WorkoutCameraScreen: React.FC<WorkoutCameraScreenProps> = ({
     caloriesBurned: 0,
     repCount: 0,
     perfectReps: 0,
+    targetReps: initialTarget,
     formAccuracyScore: 100,
     startTime: null,
     endTime: null,
@@ -93,6 +171,7 @@ export const WorkoutCameraScreen: React.FC<WorkoutCameraScreenProps> = ({
   const previousRepCountRef = useRef<number>(0);
   const previousErrorIdRef = useRef<string | null>(null);
   const geminiObservationsRef = useRef<string[]>([]);
+  const hasAutoCompletedRef = useRef<boolean>(false);
 
   // Active workout duration timer
   useEffect(() => {
@@ -131,15 +210,21 @@ export const WorkoutCameraScreen: React.FC<WorkoutCameraScreenProps> = ({
 
   // Exercise change handler
   useEffect(() => {
+    const dynamicTarget = getDynamicTargetReps(selectedExercise);
     const engine = ExerciseEngineRegistry.getEngine(selectedExercise);
     engine.reset();
     previousRepCountRef.current = 0;
     previousErrorIdRef.current = null;
+    hasAutoCompletedRef.current = false;
     setPrimaryFeedback(null);
     setGeminiCoachingTip(null);
     GeminiVisionService.clearCoachingTip();
     setIsGoodForm(true);
     setHighlightJoints([]);
+    setStats((prev) => ({
+      ...prev,
+      targetReps: dynamicTarget,
+    }));
   }, [selectedExercise]);
 
   // Tactile haptics helper
@@ -192,6 +277,8 @@ export const WorkoutCameraScreen: React.FC<WorkoutCameraScreenProps> = ({
 
       // If workout is active, track reps and scores
       if (workoutStatus === 'active') {
+        const currentTarget = stats.targetReps || getDynamicTargetReps(selectedExercise);
+
         // Check for newly completed repetition
         if (result.repCount > previousRepCountRef.current) {
           const isNewPerfect = result.perfectReps > stats.perfectReps;
@@ -218,11 +305,18 @@ export const WorkoutCameraScreen: React.FC<WorkoutCameraScreenProps> = ({
             perfectReps: result.perfectReps,
             goodReps: result.perfectReps,
             badReps,
-            targetReps: result.targetReps || 12,
+            targetReps: prev.targetReps || getDynamicTargetReps(selectedExercise),
             formAccuracyScore: result.formAccuracyScore,
             caloriesBurned: Math.round(repKcal + activeKcal),
           };
         });
+
+        // Auto-complete workout as soon as target reps or hold duration is achieved
+        if (result.repCount >= currentTarget && currentTarget > 0 && !hasAutoCompletedRef.current) {
+          hasAutoCompletedRef.current = true;
+          handleFinishWorkout(result.repCount, result.perfectReps, result.formAccuracyScore);
+          return;
+        }
       }
 
       // Asynchronous Keyframe Gemini Vision Analysis (Non-blocking background dispatch)
@@ -305,15 +399,18 @@ export const WorkoutCameraScreen: React.FC<WorkoutCameraScreenProps> = ({
     engine.reset();
     previousRepCountRef.current = 0;
     previousErrorIdRef.current = null;
+    hasAutoCompletedRef.current = false;
     setGeminiCoachingTip(null);
     GeminiVisionService.clearCoachingTip();
 
+    const target = getDynamicTargetReps(selectedExercise);
     setStats({
       durationSeconds: 0,
       activeSeconds: 0,
       caloriesBurned: 0,
       repCount: 0,
       perfectReps: 0,
+      targetReps: target,
       formAccuracyScore: 100,
       startTime: new Date(),
       endTime: null,
@@ -335,13 +432,23 @@ export const WorkoutCameraScreen: React.FC<WorkoutCameraScreenProps> = ({
     SpeechService.speak('Resuming workout.');
   };
 
-  const handleStopWorkout = () => {
-    triggerHaptic('heavy');
+  const handleFinishWorkout = (overrideReps?: number, overridePerfect?: number, overrideScore?: number) => {
+    triggerHaptic('notification');
     const now = new Date();
-    const isIsometric = selectedExercise === 'Plank';
+    const isIsometric = selectedExercise.toLowerCase().includes('plank');
     const repUnit = isIsometric ? 'seconds' : 'repetitions';
-    const goodReps = stats.perfectReps;
-    const badReps = stats.badReps ?? Math.max(0, stats.repCount - stats.perfectReps);
+
+    const finalReps = overrideReps !== undefined ? overrideReps : stats.repCount;
+    const finalPerfect = overridePerfect !== undefined ? overridePerfect : stats.perfectReps;
+    const finalScore = overrideScore !== undefined ? overrideScore : stats.formAccuracyScore;
+    const target = stats.targetReps || getDynamicTargetReps(selectedExercise);
+
+    const repKcal = finalReps * (selectedExercise === 'Pushups' || selectedExercise === 'Pullups' ? 0.48 : 0.40);
+    const activeKcal = (stats.activeSeconds / 60) * 4.2;
+    const totalCalories = Math.max(stats.caloriesBurned, Math.round(repKcal + activeKcal));
+
+    const goodReps = finalPerfect;
+    const badReps = Math.max(0, finalReps - finalPerfect);
 
     const initialSummary: WorkoutSummary = {
       id: Date.now().toString(),
@@ -351,22 +458,36 @@ export const WorkoutCameraScreen: React.FC<WorkoutCameraScreenProps> = ({
       energyLevel: checkInData?.energyLevel,
       durationSeconds: stats.durationSeconds,
       activeSeconds: stats.activeSeconds,
-      caloriesBurned: stats.caloriesBurned,
-      repCount: stats.repCount,
-      perfectReps: stats.perfectReps,
+      caloriesBurned: totalCalories,
+      repCount: finalReps,
+      perfectReps: finalPerfect,
       goodReps,
       badReps,
-      targetReps: stats.targetReps || 12,
-      formAccuracyScore: stats.formAccuracyScore,
+      targetReps: target,
+      formAccuracyScore: finalScore,
       geminiObservations: [...geminiObservationsRef.current],
       aiAnalysis: null,
       completedAt: now,
     };
 
+    setStats((prev) => ({
+      ...prev,
+      repCount: finalReps,
+      perfectReps: finalPerfect,
+      goodReps,
+      badReps,
+      formAccuracyScore: finalScore,
+      caloriesBurned: totalCalories,
+    }));
+
     setWorkoutStatus('completed');
     setSummaryData(initialSummary);
     setShowSummaryModal(true);
-    SpeechService.speak(`Workout completed. Great job! You achieved ${stats.repCount} ${repUnit}.`);
+
+    const speechText = finalReps >= target
+      ? `Goal achieved! You completed all ${finalReps} ${repUnit}. Great job!`
+      : `Workout completed. You achieved ${finalReps} ${repUnit}.`;
+    SpeechService.speak(speechText);
 
     // Asynchronously generate Post-Workout Gemini Coaching Summary
     WorkoutAiService.analyzeWorkoutSummary({
@@ -376,12 +497,12 @@ export const WorkoutCameraScreen: React.FC<WorkoutCameraScreenProps> = ({
       energyLevel: checkInData?.energyLevel,
       durationSeconds: stats.durationSeconds,
       activeSeconds: stats.activeSeconds,
-      caloriesBurned: stats.caloriesBurned,
-      repCount: stats.repCount,
+      caloriesBurned: totalCalories,
+      repCount: finalReps,
       goodReps,
       badReps,
-      plannedReps: stats.targetReps || 12,
-      formAccuracyScore: stats.formAccuracyScore,
+      plannedReps: target,
+      formAccuracyScore: finalScore,
       geminiObservations: [...geminiObservationsRef.current],
     })
       .then((aiAnalysis) => {
@@ -390,6 +511,12 @@ export const WorkoutCameraScreen: React.FC<WorkoutCameraScreenProps> = ({
       .catch((err) => {
         console.warn('[WorkoutCameraScreen] Post-workout analysis error:', err);
       });
+  };
+
+  const handleStopWorkout = () => {
+    triggerHaptic('heavy');
+    hasAutoCompletedRef.current = true;
+    handleFinishWorkout();
   };
 
   const handleSaveSummary = async () => {
@@ -401,11 +528,11 @@ export const WorkoutCameraScreen: React.FC<WorkoutCameraScreenProps> = ({
       try {
         await StorageService.saveWorkoutSession({
           id: summaryData.id,
-          date: new Date().toISOString().split('T')[0],
+          date: summaryData.completedAt.toISOString().split('T')[0],
           completedAt: summaryData.completedAt.toISOString(),
-          mood: checkInData?.mood,
-          energyLevel: checkInData?.energyLevel,
-          workoutName: summaryData.workoutName || summaryData.workoutType,
+          mood: summaryData.mood,
+          energyLevel: summaryData.energyLevel,
+          workoutName: summaryData.workoutName || `${summaryData.workoutType} Session`,
           workoutType: summaryData.workoutType,
           exercises: [
             {
@@ -417,7 +544,7 @@ export const WorkoutCameraScreen: React.FC<WorkoutCameraScreenProps> = ({
               formScore: summaryData.formAccuracyScore,
             },
           ],
-          plannedReps: summaryData.targetReps || 12,
+          plannedReps: summaryData.targetReps || getDynamicTargetReps(selectedExercise),
           actualReps: summaryData.repCount,
           goodReps,
           badReps,
@@ -438,6 +565,98 @@ export const WorkoutCameraScreen: React.FC<WorkoutCameraScreenProps> = ({
     if (onExit) onExit();
   };
 
+  const handleStartNextExercise = async () => {
+    triggerHaptic('notification');
+
+    // 1. Auto-save completed session before starting next exercise
+    if (summaryData) {
+      const goodReps = summaryData.goodReps ?? summaryData.perfectReps;
+      const badReps = summaryData.badReps ?? Math.max(0, summaryData.repCount - summaryData.perfectReps);
+
+      try {
+        await StorageService.saveWorkoutSession({
+          id: summaryData.id,
+          date: summaryData.completedAt.toISOString().split('T')[0],
+          completedAt: summaryData.completedAt.toISOString(),
+          mood: summaryData.mood,
+          energyLevel: summaryData.energyLevel,
+          workoutName: summaryData.workoutName || `${summaryData.workoutType} Session`,
+          workoutType: summaryData.workoutType,
+          exercises: [
+            {
+              name: summaryData.workoutType,
+              plannedReps: summaryData.targetReps,
+              actualReps: summaryData.repCount,
+              goodReps,
+              badReps,
+              formScore: summaryData.formAccuracyScore,
+            },
+          ],
+          plannedReps: summaryData.targetReps || getDynamicTargetReps(selectedExercise),
+          actualReps: summaryData.repCount,
+          goodReps,
+          badReps,
+          formAccuracyScore: summaryData.formAccuracyScore,
+          durationSeconds: summaryData.durationSeconds,
+          activeSeconds: summaryData.activeSeconds,
+          caloriesBurned: summaryData.caloriesBurned,
+          geminiObservations: summaryData.geminiObservations || [],
+          aiAnalysis: summaryData.aiAnalysis || undefined,
+        });
+      } catch (e) {
+        console.warn('[WorkoutCameraScreen] Error auto-saving session before next workout:', e);
+      }
+    }
+
+    if (!nextExercise) {
+      setShowSummaryModal(false);
+      resetWorkoutScreen();
+      if (onExit) onExit();
+      return;
+    }
+
+    // 2. Resolve next exercise name and target reps
+    const nextName = nextExercise.name;
+    const nextTargetReps = nextExercise.reps || getDynamicTargetReps(nextName);
+    const isPlank = nextName.toLowerCase().includes('plank');
+
+    // 3. Reset form engine and tracking
+    const newEngine = ExerciseEngineRegistry.getEngine(nextName);
+    newEngine.reset();
+    previousRepCountRef.current = 0;
+    previousErrorIdRef.current = null;
+    hasAutoCompletedRef.current = false;
+    geminiObservationsRef.current = [];
+    setGeminiCoachingTip(null);
+    GeminiVisionService.clearCoachingTip();
+    setPrimaryFeedback(null);
+    setIsGoodForm(true);
+    setHighlightJoints([]);
+
+    // 4. Update active workout state
+    setSelectedExercise(nextName);
+    setStats({
+      durationSeconds: 0,
+      activeSeconds: 0,
+      caloriesBurned: 0,
+      repCount: 0,
+      perfectReps: 0,
+      targetReps: nextTargetReps,
+      formAccuracyScore: 100,
+      startTime: new Date(),
+      endTime: null,
+    });
+
+    // 5. Dismiss modal and set workout active
+    setShowSummaryModal(false);
+    setWorkoutStatus('active');
+
+    // 6. Voice Coach Cue
+    SpeechService.speak(
+      `Starting next exercise: ${nextName}. ${isPlank ? `Hold for ${nextTargetReps} seconds.` : `Target: ${nextTargetReps} reps.`} Get ready!`
+    );
+  };
+
   const handleDismissSummary = () => {
     triggerHaptic('light');
     setShowSummaryModal(false);
@@ -451,6 +670,7 @@ export const WorkoutCameraScreen: React.FC<WorkoutCameraScreenProps> = ({
     engine.reset();
     previousRepCountRef.current = 0;
     previousErrorIdRef.current = null;
+    hasAutoCompletedRef.current = false;
     geminiObservationsRef.current = [];
     setGeminiCoachingTip(null);
     GeminiVisionService.clearCoachingTip();
@@ -513,7 +733,7 @@ export const WorkoutCameraScreen: React.FC<WorkoutCameraScreenProps> = ({
         isMuted={isMuted}
         selectedExercise={selectedExercise}
         showPoseSkeleton={showPoseSkeleton}
-        targetReps={stats.targetReps || 12}
+        targetReps={stats.targetReps || getDynamicTargetReps(selectedExercise)}
         phase={currentPhase}
         kneeAngle={liveKneeAngle}
         elbowAngle={liveElbowAngle}
@@ -548,6 +768,10 @@ export const WorkoutCameraScreen: React.FC<WorkoutCameraScreenProps> = ({
       <WorkoutSummaryModal
         visible={showSummaryModal}
         summary={summaryData}
+        nextExercise={nextExercise}
+        currentStepIndex={currentStepNumber}
+        totalStepsCount={totalExercisesCount}
+        onStartNext={nextExercise ? handleStartNextExercise : undefined}
         onSave={handleSaveSummary}
         onDismiss={handleDismissSummary}
       />

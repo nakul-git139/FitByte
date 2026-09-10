@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
+  TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -33,6 +34,14 @@ const ENERGY_LEVELS = [
   { level: 5, label: 'Peak', desc: 'Max Power' },
 ];
 
+const DURATION_PRESETS = [
+  { minutes: 10, label: '10 min', tag: 'Express' },
+  { minutes: 15, label: '15 min', tag: 'Quick' },
+  { minutes: 20, label: '20 min', tag: 'Standard' },
+  { minutes: 30, label: '30 min', tag: 'Full' },
+  { minutes: 45, label: '45 min', tag: 'Extended' },
+];
+
 interface DailyMoodCheckInScreenProps {
   initialMood?: MoodType;
   initialEnergy?: number;
@@ -50,6 +59,9 @@ export const DailyMoodCheckInScreen: React.FC<DailyMoodCheckInScreenProps> = ({
 }) => {
   const [selectedMood, setSelectedMood] = useState<MoodType | null>(initialMood || null);
   const [energyLevel, setEnergyLevel] = useState<number>(initialEnergy);
+  const [durationMinutes, setDurationMinutes] = useState<number>(20);
+  const [isCustomDuration, setIsCustomDuration] = useState<boolean>(false);
+  const [customInputText, setCustomInputText] = useState<string>('25');
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [historySummary, setHistorySummary] = useState<{
     averageFormScore: number;
@@ -82,6 +94,46 @@ export const DailyMoodCheckInScreen: React.FC<DailyMoodCheckInScreenProps> = ({
     setEnergyLevel(level);
   };
 
+  const handleSelectPreset = (mins: number) => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+    setIsCustomDuration(false);
+    setDurationMinutes(mins);
+  };
+
+  const handleSelectCustomTab = () => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+    setIsCustomDuration(true);
+    const parsed = parseInt(customInputText, 10);
+    const valid = isNaN(parsed) || parsed < 5 ? 25 : Math.min(120, parsed);
+    setDurationMinutes(valid);
+  };
+
+  const handleStepDuration = (delta: number) => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+    const current = durationMinutes || 20;
+    const nextVal = Math.max(5, Math.min(120, current + delta));
+    setDurationMinutes(nextVal);
+    setCustomInputText(String(nextVal));
+  };
+
+  const handleCustomTextChange = (text: string) => {
+    // Only allow digits
+    const cleaned = text.replace(/[^0-9]/g, '');
+    setCustomInputText(cleaned);
+    if (cleaned.length > 0) {
+      const num = parseInt(cleaned, 10);
+      if (!isNaN(num) && num > 0) {
+        setDurationMinutes(Math.max(5, Math.min(120, num)));
+      }
+    }
+  };
+
   const handleCreateWorkout = async () => {
     if (!selectedMood || isGenerating) return;
 
@@ -91,11 +143,13 @@ export const DailyMoodCheckInScreen: React.FC<DailyMoodCheckInScreenProps> = ({
       // Fallback
     }
 
+    const safeDurationMinutes = Math.max(5, Math.min(120, Number(durationMinutes) || 20));
     const moodObj = MOOD_OPTIONS.find((m) => m.type === selectedMood);
     const checkInData: MoodCheckInData = {
       mood: selectedMood,
       emoji: moodObj ? moodObj.emoji : '😊',
       energyLevel,
+      durationMinutes: safeDurationMinutes,
       timestamp: new Date(),
     };
 
@@ -103,6 +157,7 @@ export const DailyMoodCheckInScreen: React.FC<DailyMoodCheckInScreenProps> = ({
 
     try {
       const generatedWorkout = await WorkoutAiService.generateDailyWorkout(checkInData, {
+        duration: `${safeDurationMinutes} mins`,
         workoutHistory: historySummary?.historySummaryText,
         previousFormScores: historySummary
           ? `Average form score: ${historySummary.averageFormScore}% across ${historySummary.totalSessions} sessions. Last exercise: ${historySummary.lastExercise}`
@@ -155,7 +210,7 @@ export const DailyMoodCheckInScreen: React.FC<DailyMoodCheckInScreenProps> = ({
 
           <Text style={styles.mainTitle}>How are you feeling today?</Text>
           <Text style={styles.subtitle}>
-            Select your mood and energy level so Gemini can customize today's workout.
+            Select your mood, energy level, and exercise time so Gemini can customize today's workout.
           </Text>
         </View>
 
@@ -240,6 +295,193 @@ export const DailyMoodCheckInScreen: React.FC<DailyMoodCheckInScreenProps> = ({
               );
             })}
           </View>
+        </View>
+
+        {/* Workout Duration Section */}
+        <View style={styles.sectionContainer}>
+          <View style={styles.energyHeaderRow}>
+            <Text style={styles.sectionLabel}>WORKOUT DURATION</Text>
+            <Text style={styles.durationValueText}>
+              ⏱️ {durationMinutes} mins
+            </Text>
+          </View>
+
+          {/* Duration Presets + Custom Button Grid */}
+          <View style={styles.durationGrid}>
+            <View style={styles.durationRow}>
+              {DURATION_PRESETS.slice(0, 3).map((item) => {
+                const isSelected = !isCustomDuration && durationMinutes === item.minutes;
+                return (
+                  <TouchableOpacity
+                    key={item.minutes}
+                    style={[
+                      styles.durationButton,
+                      isSelected && styles.durationButtonSelected,
+                    ]}
+                    onPress={() => handleSelectPreset(item.minutes)}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[
+                        styles.durationTimeText,
+                        isSelected && styles.durationTimeTextSelected,
+                      ]}
+                    >
+                      {item.label}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.durationTagText,
+                        isSelected && styles.durationTagTextSelected,
+                      ]}
+                    >
+                      {item.tag}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <View style={styles.durationRow}>
+              {DURATION_PRESETS.slice(3, 5).map((item) => {
+                const isSelected = !isCustomDuration && durationMinutes === item.minutes;
+                return (
+                  <TouchableOpacity
+                    key={item.minutes}
+                    style={[
+                      styles.durationButton,
+                      isSelected && styles.durationButtonSelected,
+                    ]}
+                    onPress={() => handleSelectPreset(item.minutes)}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[
+                        styles.durationTimeText,
+                        isSelected && styles.durationTimeTextSelected,
+                      ]}
+                    >
+                      {item.label}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.durationTagText,
+                        isSelected && styles.durationTagTextSelected,
+                      ]}
+                    >
+                      {item.tag}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+
+              {/* Custom Duration Button */}
+              <TouchableOpacity
+                style={[
+                  styles.durationButton,
+                  isCustomDuration && styles.durationButtonSelected,
+                ]}
+                onPress={handleSelectCustomTab}
+                activeOpacity={0.7}
+              >
+                <Text
+                  style={[
+                    styles.durationTimeText,
+                    isCustomDuration && styles.durationTimeTextSelected,
+                  ]}
+                >
+                  Custom
+                </Text>
+                <Text
+                  style={[
+                    styles.durationTagText,
+                    isCustomDuration && styles.durationTagTextSelected,
+                  ]}
+                >
+                  ⚙️ Set mins
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Custom Time Control Card */}
+          {isCustomDuration && (
+            <View style={styles.customDurationCard}>
+              <View style={styles.customCardHeader}>
+                <Ionicons name="time-outline" size={16} color="#10B981" />
+                <Text style={styles.customCardTitle}>CUSTOM WORKOUT TIME</Text>
+              </View>
+
+              <View style={styles.stepperContainer}>
+                {/* Decrement Button */}
+                <TouchableOpacity
+                  style={styles.stepperButton}
+                  onPress={() => handleStepDuration(-5)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="remove" size={20} color="#F1F5F9" />
+                </TouchableOpacity>
+
+                {/* Direct Number Input */}
+                <View style={styles.numericInputWrapper}>
+                  <TextInput
+                    style={styles.numericTextInput}
+                    value={customInputText}
+                    onChangeText={handleCustomTextChange}
+                    keyboardType="number-pad"
+                    maxLength={3}
+                    placeholder="20"
+                    placeholderTextColor="#64748B"
+                    selectTextOnFocus
+                  />
+                  <Text style={styles.numericUnitText}>MINS</Text>
+                </View>
+
+                {/* Increment Button */}
+                <TouchableOpacity
+                  style={styles.stepperButton}
+                  onPress={() => handleStepDuration(5)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="add" size={20} color="#F1F5F9" />
+                </TouchableOpacity>
+              </View>
+
+              {/* Quick Preset Badges for Custom */}
+              <View style={styles.customQuickChipsRow}>
+                {[5, 12, 25, 40, 60].map((mins) => (
+                  <TouchableOpacity
+                    key={mins}
+                    style={[
+                      styles.quickChip,
+                      durationMinutes === mins && styles.quickChipActive,
+                    ]}
+                    onPress={() => {
+                      try {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      } catch {}
+                      setDurationMinutes(mins);
+                      setCustomInputText(String(mins));
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[
+                        styles.quickChipText,
+                        durationMinutes === mins && styles.quickChipTextActive,
+                      ]}
+                    >
+                      {mins}m
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={styles.customHelperText}>
+                Type any duration between 5 and 120 minutes. Gemini will calibrate reps and sets accordingly.
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Bottom CTA Button: Create My Workout */}
@@ -465,6 +707,144 @@ const styles = StyleSheet.create({
   },
   energyButtonLabelSelected: {
     color: '#38BDF8',
+  },
+  durationValueText: {
+    color: '#10B981',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  durationGrid: {
+    gap: 8,
+  },
+  durationRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  durationButton: {
+    flex: 1,
+    backgroundColor: '#1E293B',
+    borderRadius: 14,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
+  },
+  durationButtonSelected: {
+    borderColor: '#10B981',
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+  },
+  durationTimeText: {
+    color: '#94A3B8',
+    fontSize: 13,
+    fontWeight: '800',
+    marginBottom: 2,
+  },
+  durationTimeTextSelected: {
+    color: '#10B981',
+  },
+  durationTagText: {
+    color: '#64748B',
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  durationTagTextSelected: {
+    color: '#10B981',
+  },
+  customDurationCard: {
+    backgroundColor: 'rgba(30, 41, 59, 0.95)',
+    borderRadius: 16,
+    padding: 14,
+    marginTop: 10,
+    borderWidth: 1.5,
+    borderColor: 'rgba(16, 185, 129, 0.35)',
+  },
+  customCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 12,
+  },
+  customCardTitle: {
+    color: '#10B981',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+  },
+  stepperContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 16,
+    marginBottom: 12,
+  },
+  stepperButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#334155',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  numericInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    backgroundColor: '#0F172A',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: '#10B981',
+    gap: 6,
+    minWidth: 110,
+    justifyContent: 'center',
+  },
+  numericTextInput: {
+    color: '#FFFFFF',
+    fontSize: 24,
+    fontWeight: '800',
+    textAlign: 'center',
+    minWidth: 44,
+  },
+  numericUnitText: {
+    color: '#10B981',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  customQuickChipsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+    marginBottom: 10,
+  },
+  quickChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+    backgroundColor: '#0F172A',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  quickChipActive: {
+    borderColor: '#10B981',
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+  },
+  quickChipText: {
+    color: '#94A3B8',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  quickChipTextActive: {
+    color: '#10B981',
+  },
+  customHelperText: {
+    color: '#64748B',
+    fontSize: 11,
+    textAlign: 'center',
+    lineHeight: 16,
   },
   footerSection: {
     marginTop: 8,
