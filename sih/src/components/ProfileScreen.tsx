@@ -35,24 +35,19 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   const [hapticFeedback, setHapticFeedback] = useState<boolean>(true);
   const [showAboutModal, setShowAboutModal] = useState<boolean>(false);
   const [stats, setStats] = useState<DashboardStats>({
-    totalWorkouts: 12,
-    totalReps: 128,
-    totalCalories: 1240,
-    averageFormScore: 91,
-    dayStreak: 4,
-    weekDayActive: [false, false, true, false, false, false, false],
+    totalWorkouts: 0,
+    totalReps: 0,
+    totalCalories: 0,
+    averageFormScore: 0,
+    dayStreak: 0,
+    weekDayActive: [false, false, false, false, false, false, false],
     recentWorkouts: [],
   });
 
   useEffect(() => {
     StorageService.getDashboardStats()
       .then((data) => {
-        setStats({
-          ...data,
-          totalWorkouts: data.totalWorkouts > 0 ? data.totalWorkouts : 12,
-          dayStreak: data.dayStreak > 0 ? data.dayStreak : 4,
-          averageFormScore: data.averageFormScore > 0 ? data.averageFormScore : 91,
-        });
+        setStats(data);
       })
       .catch((e) => console.warn('[ProfileScreen] Error loading stats:', e));
   }, []);
@@ -130,7 +125,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
           <View style={styles.statPillCard}>
             <Text style={[styles.statPillValue, { color: Theme.colors.primaryGreen }]}>
-              {stats.averageFormScore}%
+              {stats.totalWorkouts > 0 ? `${stats.averageFormScore}%` : '—'}
             </Text>
             <Text style={styles.statPillLabel}>Avg form</Text>
           </View>

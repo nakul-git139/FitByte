@@ -25,27 +25,19 @@ export const ProgressScreen: React.FC<ProgressScreenProps> = ({
 }) => {
   const [timeRange, setTimeRange] = useState<TimeRange>('Week');
   const [stats, setStats] = useState<DashboardStats>({
-    totalWorkouts: 3,
-    totalReps: 128,
-    totalCalories: 1240,
-    averageFormScore: 89,
-    dayStreak: 4,
-    weekDayActive: [false, true, true, false, true, false, false],
+    totalWorkouts: 0,
+    totalReps: 0,
+    totalCalories: 0,
+    averageFormScore: 0,
+    dayStreak: 0,
+    weekDayActive: [false, false, false, false, false, false, false],
     recentWorkouts: [],
   });
 
   useEffect(() => {
     StorageService.getDashboardStats()
       .then((data) => {
-        setStats({
-          totalWorkouts: data.totalWorkouts > 0 ? data.totalWorkouts : 3,
-          totalReps: data.totalReps > 0 ? data.totalReps : 128,
-          totalCalories: data.totalCalories > 0 ? data.totalCalories : 1240,
-          averageFormScore: data.averageFormScore > 0 ? data.averageFormScore : 89,
-          dayStreak: data.dayStreak > 0 ? data.dayStreak : 4,
-          weekDayActive: data.weekDayActive,
-          recentWorkouts: data.recentWorkouts,
-        });
+        setStats(data);
       })
       .catch((e) => console.warn('[ProgressScreen] Error loading stats:', e));
   }, []);
@@ -110,8 +102,8 @@ export const ProgressScreen: React.FC<ProgressScreenProps> = ({
         <View style={styles.chartCard}>
           <View style={styles.barsRow}>
             {weekDayLabels.map((dayLabel, idx) => {
-              const isActive = stats.weekDayActive[idx] ?? (idx === 1 || idx === 2 || idx === 4);
-              const height = barHeights[idx];
+              const isActive = Boolean(stats.weekDayActive[idx]);
+              const height = isActive ? Math.max(36, barHeights[idx]) : 8;
               return (
                 <View key={`day-bar-${idx}`} style={styles.barCol}>
                   <View style={styles.barTrack}>
@@ -155,7 +147,7 @@ export const ProgressScreen: React.FC<ProgressScreenProps> = ({
           {/* Avg Form */}
           <View style={styles.metricCard}>
             <Text style={[styles.metricValue, { color: Theme.colors.primaryGreen }]}>
-              {stats.averageFormScore}%
+              {stats.totalWorkouts > 0 ? `${stats.averageFormScore}%` : '—'}
             </Text>
             <Text style={styles.metricLabel}>Avg form</Text>
           </View>
@@ -201,44 +193,31 @@ export const ProgressScreen: React.FC<ProgressScreenProps> = ({
                     <Text style={styles.recentRepsText}>
                       {(session.workoutType || session.workoutName || '').toLowerCase().includes('plank')
                         ? `${session.actualReps ?? 30}s hold`
-                        : `${session.actualReps ?? 12} reps`} · {session.formAccuracyScore ?? 92}%
+                        : `${session.actualReps ?? 12} reps`} · {session.formAccuracyScore ?? 100}%
                     </Text>
                   </View>
                 </TouchableOpacity>
               ))}
             </View>
           ) : (
-            <View style={styles.recentList}>
-              {/* Clean Mock Fallbacks if database has 0 historical entries */}
-              <TouchableOpacity
-                style={styles.recentItemCard}
-                onPress={() => onSelectWorkout && onSelectWorkout('Pushups')}
-                activeOpacity={0.8}
-              >
-                <View style={styles.recentIconBox}>
-                  <Ionicons name="barbell" size={18} color={Theme.colors.primaryGreen} />
-                </View>
-                <View style={styles.recentTextCol}>
-                  <Text style={styles.recentDateText}>Today</Text>
-                  <Text style={styles.recentTitleText}>Pushups</Text>
-                </View>
-                <Text style={styles.recentRepsText}>42 reps · 92%</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.recentItemCard}
-                onPress={() => onSelectWorkout && onSelectWorkout('Squats')}
-                activeOpacity={0.8}
-              >
-                <View style={styles.recentIconBox}>
-                  <Ionicons name="body" size={18} color={Theme.colors.primaryGreen} />
-                </View>
-                <View style={styles.recentTextCol}>
-                  <Text style={styles.recentDateText}>Yesterday</Text>
-                  <Text style={styles.recentTitleText}>Squats</Text>
-                </View>
-                <Text style={styles.recentRepsText}>36 reps · 88%</Text>
-              </TouchableOpacity>
+            <View style={styles.emptyRecentCard}>
+              <View style={styles.emptyRecentIconBox}>
+                <Ionicons name="fitness-outline" size={26} color={Theme.colors.primaryGreen} />
+              </View>
+              <Text style={styles.emptyRecentTitle}>No workouts yet</Text>
+              <Text style={styles.emptyRecentSub}>
+                Complete your first workout to track your reps, consistency, and real-time form accuracy.
+              </Text>
+              {onSelectWorkout && (
+                <TouchableOpacity
+                  style={styles.emptyStartButton}
+                  onPress={() => onSelectWorkout('Pushups')}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.emptyStartButtonText}>Start First Workout</Text>
+                  <Ionicons name="arrow-forward" size={14} color="#FFFFFF" style={{ marginLeft: 4 }} />
+                </TouchableOpacity>
+              )}
             </View>
           )}
         </View>
@@ -425,5 +404,52 @@ const styles = StyleSheet.create({
     fontSize: Theme.typography.sizes.xs,
     color: Theme.colors.textSecondary,
     fontWeight: '600',
+  },
+  emptyRecentCard: {
+    backgroundColor: Theme.colors.surface,
+    padding: Theme.spacing.xl,
+    borderRadius: Theme.borderRadius.xl,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Theme.colors.borderSubtle,
+    ...Theme.shadows.soft,
+  },
+  emptyRecentIconBox: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: Theme.colors.lightGreen,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Theme.spacing.md,
+  },
+  emptyRecentTitle: {
+    fontSize: Theme.typography.sizes.base,
+    fontWeight: '700',
+    color: Theme.colors.textPrimary,
+    marginBottom: 4,
+  },
+  emptyRecentSub: {
+    fontSize: Theme.typography.sizes.xs,
+    color: Theme.colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: Theme.spacing.lg,
+    maxWidth: 260,
+  },
+  emptyStartButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Theme.colors.primaryGreen,
+    paddingHorizontal: Theme.spacing.lg,
+    paddingVertical: Theme.spacing.sm + 2,
+    borderRadius: Theme.borderRadius.full,
+    gap: 6,
+    ...Theme.shadows.card,
+  },
+  emptyStartButtonText: {
+    color: '#FFFFFF',
+    fontSize: Theme.typography.sizes.xs + 1,
+    fontWeight: '700',
   },
 });

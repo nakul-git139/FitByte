@@ -1,12 +1,15 @@
 import { WorkoutSessionRecord } from '../types/workout';
 import { User } from '../types/auth';
+import { MealLogRecord } from '../types/food';
 
 const STORAGE_KEY = 'FITPILOT_WORKOUT_HISTORY_V1';
+const MEAL_STORAGE_KEY = 'FITPILOT_MEAL_HISTORY_V1';
 const AUTH_STORAGE_KEY = 'FITPILOT_AUTH_SESSION_V1';
 const LEGACY_AUTH_STORAGE_KEY = 'FITBYTE_AUTH_SESSION_V1';
 
 // In-memory cache fallback
 let memoryHistory: WorkoutSessionRecord[] = [];
+let memoryMealHistory: MealLogRecord[] = [];
 let memoryAuthSession: { token: string; user: User } | null = null;
 
 export interface DashboardStats {
@@ -62,6 +65,94 @@ export class StorageService {
   }
 
   /**
+   * Calculates the consecutive day workout streak from session history
+   */
+  public static calculateDayStreak(history: WorkoutSessionRecord[]): number {
+    if (!history || history.length === 0) return 0;
+
+    const uniqueDates = new Set<string>();
+    for (const session of history) {
+      const rawDate = session.completedAt || session.date;
+      if (rawDate) {
+        try {
+          const d = new Date(rawDate);
+          if (!isNaN(d.getTime())) {
+            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            uniqueDates.add(key);
+          }
+        } catch {}
+      }
+    }
+
+    if (uniqueDates.size === 0) return 0;
+
+    const today = new Date();
+    const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayKey = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
+
+    let checkDate = new Date(today);
+    // If no workout today, check if streak is alive from yesterday
+    if (!uniqueDates.has(todayKey)) {
+      if (!uniqueDates.has(yesterdayKey)) {
+        return 0;
+      }
+      checkDate = new Date(yesterday);
+    }
+
+    let streak = 0;
+    while (true) {
+      const key = `${checkDate.getFullYear()}-${String(checkDate.getMonth() + 1).padStart(2, '0')}-${String(checkDate.getDate()).padStart(2, '0')}`;
+      if (uniqueDates.has(key)) {
+        streak++;
+        checkDate.setDate(checkDate.getDate() - 1);
+      } else {
+        break;
+      }
+    }
+
+    return streak;
+  }
+
+  /**
+   * Calculates active workout days for the current week (Monday to Sunday)
+   */
+  public static calculateWeekDayActive(history: WorkoutSessionRecord[]): boolean[] {
+    const weekDayActive = [false, false, false, false, false, false, false];
+    if (!history || history.length === 0) return weekDayActive;
+
+    const now = new Date();
+    const currentDayOfWeek = (now.getDay() + 6) % 7; // 0 for Monday, 6 for Sunday
+
+    // Find Monday of the current week at 00:00:00
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - currentDayOfWeek);
+    monday.setHours(0, 0, 0, 0);
+
+    // Find Sunday of the current week at 23:59:59
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    sunday.setHours(23, 59, 59, 999);
+
+    for (const session of history) {
+      const rawDate = session.completedAt || session.date;
+      if (rawDate) {
+        try {
+          const d = new Date(rawDate);
+          if (!isNaN(d.getTime()) && d >= monday && d <= sunday) {
+            const dayIndex = (d.getDay() + 6) % 7;
+            weekDayActive[dayIndex] = true;
+          }
+        } catch {}
+      }
+    }
+
+    return weekDayActive;
+  }
+
+  /**
    * Computes aggregated dashboard metrics for Home, Progress, and Profile screens
    */
   public static async getDashboardStats(): Promise<DashboardStats> {
@@ -69,62 +160,31 @@ export class StorageService {
 
     if (history.length === 0) {
       return {
-        totalWorkouts: 1,
+        totalWorkouts: 0,
         totalReps: 0,
-        totalCalories: 1248,
-        averageFormScore: 92,
-        dayStreak: 4,
-        weekDayActive: [false, false, true, false, false, false, false], // Wednesday active default
-        recentWorkouts: [
-          {
-            id: 'sample-1',
-            date: new Date().toISOString().split('T')[0],
-            completedAt: new Date().toISOString(),
-            workoutName: 'Pushups Session',
-            workoutType: 'Pushups',
-            exercises: [
-              {
-                name: 'Pushups',
-                plannedReps: 12,
-                actualReps: 0,
-                goodReps: 0,
-                badReps: 0,
-                formScore: 100,
-              },
-            ],
-            plannedReps: 12,
-            actualReps: 0,
-            goodReps: 0,
-            badReps: 0,
-            formAccuracyScore: 100,
-            durationSeconds: 120,
-            activeSeconds: 90,
-            caloriesBurned: 0,
-            geminiObservations: [],
-          },
-        ],
+        totalCalories: 0,
+        averageFormScore: 0,
+        dayStreak: 0,
+        weekDayActive: [false, false, false, false, false, false, false],
+        recentWorkouts: [],
       };
     }
 
     const totalWorkouts = history.length;
     const totalReps = history.reduce((sum, s) => sum + (s.actualReps || 0), 0);
-    const totalCalories = Math.max(1248, history.reduce((sum, s) => sum + (s.caloriesBurned || 0), 0));
+    const totalCalories = history.reduce((sum, s) => sum + (s.caloriesBurned || 0), 0);
     const avgScore = Math.round(
-      history.reduce((sum, s) => sum + (s.formAccuracyScore || 85), 0) / history.length
+      history.reduce((sum, s) => sum + (s.formAccuracyScore || 100), 0) / history.length
     );
-
-    // Calculate which days this week had workouts
-    const now = new Date();
-    const dayOfWeek = (now.getDay() + 6) % 7; // 0 for Monday, 6 for Sunday
-    const weekDayActive = [false, false, false, false, false, false, false];
-    weekDayActive[dayOfWeek] = true;
+    const dayStreak = this.calculateDayStreak(history);
+    const weekDayActive = this.calculateWeekDayActive(history);
 
     return {
       totalWorkouts,
       totalReps,
       totalCalories,
-      averageFormScore: avgScore || 92,
-      dayStreak: Math.max(4, totalWorkouts),
+      averageFormScore: avgScore,
+      dayStreak,
       weekDayActive,
       recentWorkouts: history.slice(0, 10),
     };
@@ -235,6 +295,60 @@ export class StorageService {
       }
     } catch (e) {
       console.warn('[StorageService] Error clearing auth session:', e);
+    }
+  }
+
+  /**
+   * Retrieves all saved meal logs sorted by date (newest first)
+   */
+  public static async getMealHistory(): Promise<MealLogRecord[]> {
+    try {
+      if (typeof globalThis !== 'undefined' && (globalThis as any).localStorage) {
+        const raw = (globalThis as any).localStorage.getItem(MEAL_STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            memoryMealHistory = parsed;
+            return parsed;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[StorageService] Error reading meal localStorage:', e);
+    }
+
+    return [...memoryMealHistory];
+  }
+
+  /**
+   * Saves a analyzed meal record to persistent history
+   */
+  public static async saveMealLog(meal: MealLogRecord): Promise<void> {
+    try {
+      const history = await this.getMealHistory();
+      const updated = [meal, ...history.filter((m) => m.id !== meal.id)].slice(0, 50);
+      memoryMealHistory = updated;
+
+      if (typeof globalThis !== 'undefined' && (globalThis as any).localStorage) {
+        (globalThis as any).localStorage.setItem(MEAL_STORAGE_KEY, JSON.stringify(updated));
+      }
+    } catch (e) {
+      console.warn('[StorageService] Error saving meal log:', e);
+      memoryMealHistory = [meal, ...memoryMealHistory].slice(0, 50);
+    }
+  }
+
+  /**
+   * Clears meal history
+   */
+  public static async clearMealHistory(): Promise<void> {
+    memoryMealHistory = [];
+    try {
+      if (typeof globalThis !== 'undefined' && (globalThis as any).localStorage) {
+        (globalThis as any).localStorage.removeItem(MEAL_STORAGE_KEY);
+      }
+    } catch (e) {
+      console.warn('[StorageService] Error clearing meal storage:', e);
     }
   }
 }

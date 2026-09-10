@@ -15,11 +15,14 @@ import { DailyMoodCheckInScreen } from './src/components/DailyMoodCheckInScreen'
 import { TodaysWorkoutScreen } from './src/components/TodaysWorkoutScreen';
 import { WorkoutReadyScreen } from './src/components/WorkoutReadyScreen';
 import { WorkoutCameraScreen } from './src/components/WorkoutCameraScreen';
+import { FoodScannerScreen } from './src/components/FoodScannerScreen';
+import { FoodAnalysisResultScreen } from './src/components/FoodAnalysisResultScreen';
 
 import { AuthService } from './src/services/authService';
 import { User } from './src/types/auth';
 import { MoodCheckInData } from './src/types/mood';
 import { GeneratedWorkout } from './src/types/aiWorkout';
+import { FoodAnalysisResult } from './src/types/food';
 import { Theme } from './src/config/theme';
 
 type AppView =
@@ -30,7 +33,9 @@ type AppView =
   | 'mood-checkin'
   | 'todays-workout'
   | 'workout-ready'
-  | 'workout-camera';
+  | 'workout-camera'
+  | 'food-scanner'
+  | 'food-result';
 
 export default function App() {
   const [currentView, setCurrentView] = useState<AppView>('splash');
@@ -40,6 +45,7 @@ export default function App() {
   const [generatedWorkout, setGeneratedWorkout] = useState<GeneratedWorkout | null>(null);
   const [selectedExercise, setSelectedExercise] = useState<string>('Pushups');
   const [selectedTargetReps, setSelectedTargetReps] = useState<number | undefined>(undefined);
+  const [foodAnalysisResult, setFoodAnalysisResult] = useState<FoodAnalysisResult | null>(null);
 
   // Check stored auth session on startup
   useEffect(() => {
@@ -183,6 +189,7 @@ export default function App() {
                 onSelectQuickExercise={handleQuickLaunchExercise}
                 onNavigateToWorkouts={() => setActiveTab('workout')}
                 onNavigateToProfile={() => setActiveTab('profile')}
+                onScanFood={() => setCurrentView('food-scanner')}
               />
             )}
 
@@ -218,6 +225,32 @@ export default function App() {
               onTabSelect={(tab) => setActiveTab(tab)}
             />
           </View>
+        )}
+
+        {currentView === 'food-scanner' && (
+          <FoodScannerScreen
+            userProfile={{
+              fitnessGoal: 'General Fitness & Lean Tone',
+              weightKg: 70,
+              heightCm: 175,
+              age: 25,
+              activityLevel: 'moderate',
+              dietaryPreference: 'balanced',
+            }}
+            onAnalysisComplete={(analysis) => {
+              setFoodAnalysisResult(analysis);
+              setCurrentView('food-result');
+            }}
+            onBack={() => handleReturnToTabs('home')}
+          />
+        )}
+
+        {currentView === 'food-result' && foodAnalysisResult && (
+          <FoodAnalysisResultScreen
+            result={foodAnalysisResult}
+            onScanAnother={() => setCurrentView('food-scanner')}
+            onDone={() => handleReturnToTabs('home')}
+          />
         )}
 
         {currentView === 'mood-checkin' && (

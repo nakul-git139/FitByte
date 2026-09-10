@@ -95,6 +95,42 @@ export const DailyMoodCheckInScreen: React.FC<DailyMoodCheckInScreenProps> = ({
     setCustomInputText(String(mins));
   };
 
+  const handleSelectCustom = () => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+    setIsCustomDuration(true);
+  };
+
+  const handleStepDuration = (delta: number) => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+    setIsCustomDuration(true);
+    const nextVal = Math.max(5, Math.min(120, durationMinutes + delta));
+    setDurationMinutes(nextVal);
+    setCustomInputText(String(nextVal));
+  };
+
+  const handleCustomInputChange = (text: string) => {
+    const cleaned = text.replace(/[^0-9]/g, '');
+    setCustomInputText(cleaned);
+    if (cleaned.length > 0) {
+      const num = parseInt(cleaned, 10);
+      if (!isNaN(num)) {
+        const clamped = Math.max(1, Math.min(120, num));
+        setDurationMinutes(clamped);
+      }
+    }
+  };
+
+  const handleCustomInputBlur = () => {
+    const num = parseInt(customInputText, 10);
+    const safe = isNaN(num) || num < 5 ? 5 : Math.min(120, num);
+    setDurationMinutes(safe);
+    setCustomInputText(String(safe));
+  };
+
   const handleCreateWorkout = async () => {
     if (!selectedMood || isGenerating) return;
 
@@ -250,7 +286,12 @@ export const DailyMoodCheckInScreen: React.FC<DailyMoodCheckInScreenProps> = ({
 
         {/* 3. Duration Selector */}
         <View style={styles.sectionCard}>
-          <Text style={styles.sectionLabel}>Workout Duration</Text>
+          <View style={styles.cardHeaderRow}>
+            <Text style={styles.sectionLabel}>Workout Duration</Text>
+            <Text style={styles.durationValueText}>{durationMinutes} min</Text>
+          </View>
+
+          {/* Preset & Custom Pills Row */}
           <View style={styles.presetRow}>
             {DURATION_PRESETS.map((preset) => {
               const isSelected = !isCustomDuration && durationMinutes === preset.minutes;
@@ -270,7 +311,114 @@ export const DailyMoodCheckInScreen: React.FC<DailyMoodCheckInScreenProps> = ({
                 </TouchableOpacity>
               );
             })}
+
+            {/* Custom Time Pill */}
+            <TouchableOpacity
+              style={[
+                styles.presetPill,
+                styles.customPresetPill,
+                isCustomDuration && styles.presetPillSelected,
+              ]}
+              onPress={handleSelectCustom}
+              activeOpacity={0.8}
+            >
+              <Ionicons
+                name="timer-outline"
+                size={14}
+                color={isCustomDuration ? '#FFFFFF' : Theme.colors.primaryGreen}
+                style={{ marginRight: 4 }}
+              />
+              <Text style={[styles.presetText, isCustomDuration && styles.presetTextSelected]}>
+                Custom
+              </Text>
+            </TouchableOpacity>
           </View>
+
+          {/* Custom Duration Interactive Stepper */}
+          {isCustomDuration && (
+            <View style={styles.customDurationBox}>
+              <View style={styles.stepperRow}>
+                <TouchableOpacity
+                  style={styles.stepperButton}
+                  onPress={() => handleStepDuration(-5)}
+                  activeOpacity={0.7}
+                  accessibilityLabel="Decrease duration by 5 minutes"
+                >
+                  <Ionicons name="remove" size={20} color={Theme.colors.textPrimary} />
+                </TouchableOpacity>
+
+                <View style={styles.stepperInputContainer}>
+                  <TextInput
+                    style={styles.stepperTextInput}
+                    value={customInputText}
+                    onChangeText={handleCustomInputChange}
+                    onBlur={handleCustomInputBlur}
+                    keyboardType="number-pad"
+                    maxLength={3}
+                    selectTextOnFocus
+                  />
+                  <Text style={styles.stepperUnitText}>minutes</Text>
+                </View>
+
+                <TouchableOpacity
+                  style={styles.stepperButton}
+                  onPress={() => handleStepDuration(5)}
+                  activeOpacity={0.7}
+                  accessibilityLabel="Increase duration by 5 minutes"
+                >
+                  <Ionicons name="add" size={20} color={Theme.colors.textPrimary} />
+                </TouchableOpacity>
+              </View>
+
+              {/* Quick Custom Time Chips */}
+              <View style={styles.quickChipsRow}>
+                {[10, 35, 50, 60].map((mins) => (
+                  <TouchableOpacity
+                    key={`quick-${mins}`}
+                    style={[
+                      styles.quickChip,
+                      durationMinutes === mins && styles.quickChipActive,
+                    ]}
+                    onPress={() => handleSelectPreset(mins)}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[
+                        styles.quickChipText,
+                        durationMinutes === mins && styles.quickChipTextActive,
+                      ]}
+                    >
+                      {mins}m
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+                <TouchableOpacity
+                  style={styles.quickChip}
+                  onPress={() => handleStepDuration(5)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.quickChipText}>+5m</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.quickChip}
+                  onPress={() => handleStepDuration(10)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.quickChipText}>+10m</Text>
+                </TouchableOpacity>
+              </View>
+
+              <Text style={styles.durationCoachNote}>
+                {durationMinutes <= 10
+                  ? '⚡ Express Activation — short, focused session to activate your body.'
+                  : durationMinutes <= 20
+                  ? '🌱 Steady Consistency — balanced volume without accumulating fatigue.'
+                  : durationMinutes <= 35
+                  ? '🔥 Optimal Volume — full-body conditioning across key movement patterns.'
+                  : '🏆 High Capacity Mastery — progressive overload and endurance.'}
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* 4. Empathetic Coach Quote */}
@@ -464,6 +612,99 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 8,
     marginTop: 8,
+  },
+  durationValueText: {
+    fontSize: Theme.typography.sizes.sm,
+    fontWeight: '700',
+    color: Theme.colors.primaryGreen,
+  },
+  customPresetPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(31, 107, 79, 0.25)',
+  },
+  customDurationBox: {
+    marginTop: Theme.spacing.md,
+    paddingTop: Theme.spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: Theme.colors.borderSubtle,
+  },
+  stepperRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: Theme.spacing.md,
+    gap: 12,
+  },
+  stepperButton: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: Theme.colors.surfaceSecondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: Theme.colors.borderSubtle,
+    ...Theme.shadows.soft,
+  },
+  stepperInputContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Theme.colors.surfaceSecondary,
+    height: 48,
+    borderRadius: Theme.borderRadius.lg,
+    paddingHorizontal: 12,
+    borderWidth: 1.5,
+    borderColor: Theme.colors.primaryGreen,
+    gap: 6,
+  },
+  stepperTextInput: {
+    fontSize: Theme.typography.sizes.xl,
+    fontWeight: '800',
+    color: Theme.colors.primaryGreenDark,
+    textAlign: 'center',
+    minWidth: 44,
+  },
+  stepperUnitText: {
+    fontSize: Theme.typography.sizes.sm,
+    fontWeight: '600',
+    color: Theme.colors.textSecondary,
+  },
+  quickChipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: Theme.spacing.sm,
+  },
+  quickChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: Theme.borderRadius.md,
+    backgroundColor: Theme.colors.surfaceSecondary,
+    borderWidth: 1,
+    borderColor: Theme.colors.borderSubtle,
+  },
+  quickChipActive: {
+    backgroundColor: Theme.colors.lightGreen,
+    borderColor: Theme.colors.primaryGreen,
+  },
+  quickChipText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Theme.colors.textSecondary,
+  },
+  quickChipTextActive: {
+    color: Theme.colors.primaryGreenDark,
+  },
+  durationCoachNote: {
+    fontSize: 11,
+    color: Theme.colors.textSecondary,
+    lineHeight: 16,
+    marginTop: 4,
+    fontStyle: 'italic',
   },
   presetPill: {
     paddingHorizontal: Theme.spacing.md,

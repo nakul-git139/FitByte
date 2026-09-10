@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { WorkoutStatus } from '../types/workout';
+import { Theme } from '../config/theme';
 
 interface WorkoutControlsProps {
   status: WorkoutStatus;
@@ -18,158 +19,149 @@ export const WorkoutControls: React.FC<WorkoutControlsProps> = ({
   onResumeWorkout,
   onStopWorkout,
 }) => {
+  // 1. Idle State: Smaller Circular Start Button (76px diameter)
   if (status === 'idle') {
     return (
-      <View style={styles.container}>
-        <TouchableOpacity
-          style={styles.startButton}
-          activeOpacity={0.85}
-          onPress={onStartWorkout}
-        >
-          <View style={styles.startIconCircle}>
-            <Ionicons name="play" size={24} color="#FFFFFF" style={{ marginLeft: 2 }} />
-          </View>
-          <View style={styles.startTextWrapper}>
-            <Text style={styles.startButtonText}>START WORKOUT</Text>
-            <Text style={styles.startButtonSubtext}>Live AI Form Coach Ready</Text>
-          </View>
-        </TouchableOpacity>
+      <View style={styles.idleContainer} pointerEvents="box-none">
+        <View style={styles.startFabWrapper}>
+          <TouchableOpacity
+            style={styles.startFab}
+            activeOpacity={0.85}
+            onPress={onStartWorkout}
+            accessibilityLabel="Start Workout"
+          >
+            <View style={styles.startFabInner}>
+              <Ionicons name="play" size={32} color="#FFFFFF" style={{ marginLeft: 4 }} />
+            </View>
+          </TouchableOpacity>
+          <Text style={styles.startFabLabel}>Start</Text>
+        </View>
       </View>
     );
   }
 
+  // 2. Active / Paused State: Circular Pause & Outlined Stop Buttons
   return (
-    <View style={styles.container}>
+    <View style={styles.activeContainer} pointerEvents="box-none">
       <View style={styles.activeControlsRow}>
-        {/* Pause / Resume Button */}
-        {status === 'active' ? (
+        {/* Pause / Resume Action */}
+        <View style={styles.controlItem}>
           <TouchableOpacity
-            style={[styles.actionButton, styles.pauseButton]}
+            style={styles.pauseFab}
             activeOpacity={0.8}
-            onPress={onPauseWorkout}
+            onPress={status === 'active' ? onPauseWorkout : onResumeWorkout}
+            accessibilityLabel={status === 'active' ? 'Pause Workout' : 'Resume Workout'}
           >
-            <Ionicons name="pause" size={20} color="#FFFFFF" />
-            <Text style={styles.actionButtonText}>Pause</Text>
+            <Ionicons
+              name={status === 'active' ? 'pause' : 'play'}
+              size={24}
+              color="#FFFFFF"
+              style={status !== 'active' ? { marginLeft: 3 } : undefined}
+            />
           </TouchableOpacity>
-        ) : (
-          <TouchableOpacity
-            style={[styles.actionButton, styles.resumeButton]}
-            activeOpacity={0.8}
-            onPress={onResumeWorkout}
-          >
-            <Ionicons name="play" size={20} color="#FFFFFF" />
-            <Text style={styles.actionButtonText}>Resume</Text>
-          </TouchableOpacity>
-        )}
+          <Text style={styles.controlLabel}>{status === 'active' ? 'Pause' : 'Resume'}</Text>
+        </View>
 
-        {/* Stop / End Workout Button */}
-        <TouchableOpacity
-          style={[styles.actionButton, styles.stopButton]}
-          activeOpacity={0.8}
-          onPress={onStopWorkout}
-        >
-          <Ionicons name="stop" size={18} color="#FFFFFF" />
-          <Text style={styles.actionButtonText}>STOP WORKOUT</Text>
-        </TouchableOpacity>
+        {/* Stop Workout Action (Secondary / Less dominant) */}
+        <View style={styles.controlItem}>
+          <TouchableOpacity
+            style={styles.stopFab}
+            activeOpacity={0.8}
+            onPress={onStopWorkout}
+            accessibilityLabel="Stop Workout"
+          >
+            <View style={styles.stopSquareIcon} />
+          </TouchableOpacity>
+          <Text style={styles.controlLabel}>Stop workout</Text>
+        </View>
       </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  idleContainer: {
     width: '100%',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    marginBottom: 28,
+    justifyContent: 'center',
+    marginBottom: 24,
   },
-  startButton: {
-    flexDirection: 'row',
+  startFabWrapper: {
+    alignItems: 'center',
+    gap: 8,
+  },
+  startFab: {
+    width: 78,
+    height: 78,
+    borderRadius: 39,
+    backgroundColor: 'rgba(31, 107, 79, 0.35)',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#10B981',
-    paddingVertical: 14,
-    paddingHorizontal: 28,
-    borderRadius: 26,
-    width: '100%',
-    shadowColor: '#10B981',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.45,
-    shadowRadius: 14,
-    elevation: 8,
-    gap: 14,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.25)',
+    borderWidth: 2,
+    borderColor: 'rgba(47, 138, 100, 0.6)',
   },
-  startIconCircle: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
+  startFabInner: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: Theme.colors.primaryGreen,
     alignItems: 'center',
+    justifyContent: 'center',
+    ...Theme.shadows.elevated,
   },
-  startTextWrapper: {
-    alignItems: 'flex-start',
-  },
-  startButtonText: {
+  startFabLabel: {
     color: '#FFFFFF',
-    fontSize: 17,
-    fontWeight: '900',
-    letterSpacing: 0.8,
+    fontSize: Theme.typography.sizes.sm,
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
-  startButtonSubtext: {
-    color: 'rgba(255, 255, 255, 0.85)',
-    fontSize: 11,
-    fontWeight: '600',
-    marginTop: 1,
+  activeContainer: {
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 24,
   },
   activeControlsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    width: '100%',
-    gap: 12,
+    justifyContent: 'center',
+    gap: 36,
   },
-  actionButton: {
-    flexDirection: 'row',
+  controlItem: {
+    alignItems: 'center',
+    gap: 6,
+  },
+  pauseFab: {
+    width: 62,
+    height: 62,
+    borderRadius: 31,
+    backgroundColor: 'rgba(15, 23, 42, 0.85)',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 15,
-    borderRadius: 22,
-    gap: 8,
-    elevation: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
+    ...Theme.shadows.card,
   },
-  pauseButton: {
-    flex: 1,
-    backgroundColor: 'rgba(245, 158, 11, 0.9)',
-    shadowColor: '#F59E0B',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
+  stopFab: {
+    width: 62,
+    height: 62,
+    borderRadius: 31,
+    backgroundColor: 'rgba(15, 23, 42, 0.85)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: 'rgba(239, 68, 68, 0.5)',
+    ...Theme.shadows.card,
   },
-  resumeButton: {
-    flex: 1,
-    backgroundColor: 'rgba(16, 185, 129, 0.9)',
-    shadowColor: '#10B981',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
+  stopSquareIcon: {
+    width: 18,
+    height: 18,
+    borderRadius: 3,
+    backgroundColor: '#EF4444',
   },
-  stopButton: {
-    flex: 1.4,
-    backgroundColor: 'rgba(239, 68, 68, 0.9)',
-    shadowColor: '#EF4444',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 10,
-  },
-  actionButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '800',
-    letterSpacing: 0.6,
+  controlLabel: {
+    color: 'rgba(255, 255, 255, 0.85)',
+    fontSize: Theme.typography.sizes.xs,
+    fontWeight: '600',
   },
 });

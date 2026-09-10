@@ -147,16 +147,21 @@ export const WorkoutReadyScreen: React.FC<WorkoutReadyScreenProps> = ({
           </View>
         </View>
 
-        {/* Action Buttons */}
-        <View style={styles.actionButtonsCol}>
-          <TouchableOpacity
-            style={styles.startWorkoutButton}
-            onPress={handleStart}
-            activeOpacity={0.85}
-          >
-            <Ionicons name="play" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
-            <Text style={styles.startWorkoutButtonText}>Start Workout</Text>
-          </TouchableOpacity>
+        {/* Action Buttons: Circular Start FAB + Change Exercise */}
+        <View style={styles.bottomActionWrapper}>
+          <View style={styles.startFabWrapper}>
+            <TouchableOpacity
+              style={styles.startFab}
+              onPress={handleStart}
+              activeOpacity={0.85}
+              accessibilityLabel="Start Camera Workout"
+            >
+              <View style={styles.startFabInner}>
+                <Ionicons name="play" size={32} color="#FFFFFF" style={{ marginLeft: 4 }} />
+              </View>
+            </TouchableOpacity>
+            <Text style={styles.startFabLabel}>Start</Text>
+          </View>
 
           <TouchableOpacity
             style={styles.changeExerciseButton}
@@ -314,25 +319,41 @@ const styles = StyleSheet.create({
     color: Theme.colors.primaryGreenDark,
     marginTop: 2,
   },
-  actionButtonsCol: {
-    gap: Theme.spacing.sm,
+  bottomActionWrapper: {
+    alignItems: 'center',
+    marginTop: Theme.spacing.sm,
+    gap: 12,
   },
-  startWorkoutButton: {
-    backgroundColor: Theme.colors.primaryGreen,
-    flexDirection: 'row',
+  startFabWrapper: {
+    alignItems: 'center',
+    gap: 6,
+  },
+  startFab: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: Theme.colors.lightGreen,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: Theme.spacing.base,
-    borderRadius: Theme.borderRadius.lg,
+    borderWidth: 2,
+    borderColor: 'rgba(31, 107, 79, 0.4)',
+  },
+  startFabInner: {
+    width: 66,
+    height: 66,
+    borderRadius: 33,
+    backgroundColor: Theme.colors.primaryGreen,
+    alignItems: 'center',
+    justifyContent: 'center',
     ...Theme.shadows.elevated,
   },
-  startWorkoutButtonText: {
-    color: '#FFFFFF',
-    fontSize: Theme.typography.sizes.md,
+  startFabLabel: {
+    color: Theme.colors.textPrimary,
+    fontSize: Theme.typography.sizes.sm,
     fontWeight: '700',
   },
   changeExerciseButton: {
-    paddingVertical: Theme.spacing.md,
+    paddingVertical: Theme.spacing.sm,
     alignItems: 'center',
     justifyContent: 'center',
   },
