@@ -5,12 +5,15 @@ import {
   View,
   TouchableOpacity,
   ScrollView,
+  Image,
+  ImageBackground,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { StorageService, DashboardStats } from '../services/storageService';
 import { User } from '../types/auth';
+import { Theme } from '../config/theme';
 
 interface HomeScreenProps {
   user?: User | null;
@@ -30,67 +33,67 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [stats, setStats] = useState<DashboardStats>({
     totalWorkouts: 1,
     totalReps: 0,
-    totalCalories: 1248,
+    totalCalories: 320,
     averageFormScore: 92,
     dayStreak: 4,
     weekDayActive: [false, false, true, false, false, false, false],
     recentWorkouts: [],
   });
 
-  const [showAllQuickWorkouts, setShowAllQuickWorkouts] = useState<boolean>(false);
-
   useEffect(() => {
     StorageService.getDashboardStats()
-      .then((data) => setStats(data))
+      .then((data) => {
+        setStats({
+          ...data,
+          totalCalories: data.totalCalories > 0 ? data.totalCalories : 320,
+          dayStreak: data.dayStreak > 0 ? data.dayStreak : 4,
+        });
+      })
       .catch((e) => console.warn('[HomeScreen] Error loading stats:', e));
   }, []);
 
   const handleStartWorkout = () => {
     try {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch {
-      // Fallback
-    }
+    } catch {}
     onStartMainWorkout();
   };
 
   const handleQuickPlay = (exerciseName: string) => {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    } catch {
-      // Fallback
-    }
+    } catch {}
     onSelectQuickExercise(exerciseName);
   };
 
   const quickExercises = [
     {
       name: 'Pushups',
-      subtitle: 'Intermediate • Upper Body',
-      icon: 'barbell' as const,
-      color: '#10B981',
+      subtitle: 'Upper body',
+      difficulty: 'Intermediate',
+      imageUrl: 'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?auto=format&fit=crop&w=400&q=80',
     },
     {
       name: 'Squats',
-      subtitle: 'Beginner • Lower Body',
-      icon: 'body' as const,
-      color: '#38BDF8',
+      subtitle: 'Lower body',
+      difficulty: 'Beginner',
+      imageUrl: 'https://images.unsplash.com/photo-1574680096145-d05b474e2155?auto=format&fit=crop&w=400&q=80',
     },
     {
       name: 'Plank',
-      subtitle: 'Beginner • Core & Spine',
-      icon: 'timer' as const,
-      color: '#F59E0B',
+      subtitle: 'Core & Spine',
+      difficulty: 'Beginner',
+      imageUrl: 'https://images.unsplash.com/photo-1549060279-7e168fcee0c2?auto=format&fit=crop&w=400&q=80',
     },
     {
-      name: 'Pullups',
-      subtitle: 'Advanced • Back & Arms',
-      icon: 'trending-up' as const,
-      color: '#8B5CF6',
+      name: 'Bicep Curls',
+      subtitle: 'Arms & Power',
+      difficulty: 'Beginner',
+      imageUrl: 'https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?auto=format&fit=crop&w=400&q=80',
     },
   ];
 
-  const displayedQuickExercises = showAllQuickWorkouts ? quickExercises : quickExercises.slice(0, 2);
+  const displayName = user?.name ? user.name.split(' ')[0] : 'Athlete';
 
   return (
     <SafeAreaView style={styles.safeContainer} edges={['top', 'left', 'right']}>
@@ -98,148 +101,118 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Top Greeting Header */}
-        <View style={styles.topHeaderRow}>
+        {/* Top Header: Greeting & Profile */}
+        <View style={styles.headerRow}>
           <View>
-            <Text style={styles.greetingSub}>Good morning,</Text>
             <Text style={styles.greetingTitle}>
-              {user?.name ? user.name.split(' ')[0] : 'Athlete'}
+              Good morning, {displayName} 👋
             </Text>
+            <Text style={styles.greetingSub}>Ready to move today?</Text>
           </View>
+
           <TouchableOpacity
-            style={styles.avatarButton}
+            style={styles.profileAvatarButton}
             onPress={onNavigateToProfile}
             activeOpacity={0.7}
           >
             <Ionicons
               name={user?.authProvider === 'google' ? 'logo-google' : 'person'}
-              size={user?.authProvider === 'google' ? 18 : 20}
-              color="#FFFFFF"
+              size={18}
+              color={Theme.colors.primaryGreen}
             />
           </TouchableOpacity>
         </View>
 
-        {/* 1. Hero Card: Ready for today's workout? */}
-        <View style={styles.heroCard}>
-          <View style={styles.heroTopRow}>
-            <View style={styles.heroTextContainer}>
-              <Text style={styles.heroTitle}>Ready for today's{'\n'}workout?</Text>
-              <Text style={styles.heroSubtitle}>
-                Train smarter with AI-powered form analysis.
-              </Text>
-            </View>
-            <View style={styles.heroIconCircle}>
-              <Ionicons name="pulse" size={28} color="#10B981" />
-            </View>
-          </View>
-
-          <TouchableOpacity
-            style={styles.startWorkoutHeroButton}
-            onPress={handleStartWorkout}
-            activeOpacity={0.85}
+        {/* 1. TODAY'S GOAL Hero Card */}
+        <View style={styles.heroCardContainer}>
+          <ImageBackground
+            source={{ uri: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1000&q=80' }}
+            style={styles.heroBackground}
+            imageStyle={styles.heroBackgroundImage}
           >
-            <Ionicons name="play" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-            <Text style={styles.startWorkoutHeroButtonText}>Start Workout</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* 2. Dual Metrics Row (KCAL BURNED + DAY STREAK) */}
-        <View style={styles.statsRow}>
-          {/* Calories Card */}
-          <View style={styles.statCard}>
-            <Ionicons name="flame" size={22} color="#F59E0B" style={styles.statIcon} />
-            <Text style={styles.statNumber}>
-              {stats.totalCalories.toLocaleString()}
-            </Text>
-            <Text style={styles.statLabel}>KCAL BURNED</Text>
-          </View>
-
-          {/* Day Streak Card */}
-          <View style={styles.statCard}>
-            <Ionicons name="flash" size={22} color="#38BDF8" style={styles.statIcon} />
-            <Text style={styles.statNumber}>{stats.dayStreak}</Text>
-            <Text style={styles.statLabel}>DAY STREAK</Text>
-          </View>
-        </View>
-
-        {/* 3. Quick Workouts Section */}
-        <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>Quick Workouts</Text>
-          <TouchableOpacity
-            onPress={() => setShowAllQuickWorkouts((prev) => !prev)}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.seeAllText}>
-              {showAllQuickWorkouts ? 'Show Less' : 'See All'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.quickWorkoutsList}>
-          {displayedQuickExercises.map((item) => (
-            <TouchableOpacity
-              key={item.name}
-              style={styles.quickWorkoutCard}
-              onPress={() => handleQuickPlay(item.name)}
-              activeOpacity={0.75}
-            >
-              <View style={[styles.exerciseIconBox, { backgroundColor: 'rgba(16, 185, 129, 0.12)' }]}>
-                <Ionicons name={item.icon} size={22} color={item.color} />
+            <View style={styles.heroOverlay}>
+              <View style={styles.heroTagBadge}>
+                <Text style={styles.heroTagText}>TODAY'S GOAL</Text>
               </View>
 
-              <View style={styles.exerciseTextColumn}>
-                <Text style={styles.exerciseNameText}>{item.name}</Text>
-                <Text style={styles.exerciseCategoryText}>{item.subtitle}</Text>
-              </View>
+              <Text style={styles.heroTitle}>Feel stronger.{'\n'}Move better.</Text>
 
               <TouchableOpacity
-                style={styles.playButtonCircle}
-                onPress={() => handleQuickPlay(item.name)}
-                activeOpacity={0.8}
+                style={styles.startWorkoutButton}
+                onPress={handleStartWorkout}
+                activeOpacity={0.85}
               >
-                <Ionicons name="play" size={16} color="#FFFFFF" style={{ marginLeft: 2 }} />
+                <Text style={styles.startWorkoutButtonText}>Start Workout</Text>
+                <Ionicons name="arrow-forward" size={16} color="#FFFFFF" style={{ marginLeft: 6 }} />
               </TouchableOpacity>
+            </View>
+          </ImageBackground>
+        </View>
+
+        {/* 2. YOUR DAY: Dual Metric Cards (Calories + Streak) */}
+        <View style={styles.metricsRow}>
+          {/* Calories Card */}
+          <View style={styles.metricCard}>
+            <View style={styles.metricIconCircle}>
+              <Ionicons name="flame" size={20} color="#EA580C" />
+            </View>
+            <View>
+              <Text style={styles.metricValue}>{stats.totalCalories} kcal</Text>
+              <Text style={styles.metricLabel}>Calories burned</Text>
+            </View>
+          </View>
+
+          {/* Streak Card */}
+          <View style={styles.metricCard}>
+            <View style={styles.metricIconCircle}>
+              <Ionicons name="trophy" size={20} color="#D97706" />
+            </View>
+            <View>
+              <Text style={styles.metricValue}>{stats.dayStreak} day streak</Text>
+              <Text style={styles.metricLabel}>Consistency</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* 3. QUICK START Section */}
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.sectionTitle}>Quick Start</Text>
+          <TouchableOpacity onPress={onNavigateToWorkouts} activeOpacity={0.7}>
+            <Text style={styles.sectionSeeAll}>See All</Text>
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.quickStartScroll}
+        >
+          {quickExercises.map((item) => (
+            <TouchableOpacity
+              key={item.name}
+              style={styles.quickCard}
+              onPress={() => handleQuickPlay(item.name)}
+              activeOpacity={0.8}
+            >
+              <Image
+                source={{ uri: item.imageUrl }}
+                style={styles.quickCardImage}
+                resizeMode="cover"
+              />
+              <View style={styles.quickCardContent}>
+                <Text style={styles.quickCardTitle}>{item.name}</Text>
+                <Text style={styles.quickCardSubtitle}>{item.subtitle}</Text>
+                <View style={styles.quickCardBottomRow}>
+                  <Text style={styles.quickCardDiff}>{item.difficulty}</Text>
+                  <View style={styles.playArrowCircle}>
+                    <Ionicons name="play" size={12} color="#FFFFFF" style={{ marginLeft: 2 }} />
+                  </View>
+                </View>
+              </View>
             </TouchableOpacity>
           ))}
-        </View>
-
-        {/* 4. Weekly Progress Section */}
-        <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>Weekly Progress</Text>
-        </View>
-
-        <View style={styles.weeklyProgressCard}>
-          <View style={styles.progressHeaderRow}>
-            <Text style={styles.progressTitle}>Form Accuracy</Text>
-            <Text style={styles.progressPercentText}>{stats.averageFormScore}%</Text>
-          </View>
-
-          {/* Progress Bar Track */}
-          <View style={styles.progressBarTrack}>
-            <View
-              style={[
-                styles.progressBarFill,
-                { width: `${Math.min(100, Math.max(10, stats.averageFormScore))}%` },
-              ]}
-            />
-          </View>
-
-          <Text style={styles.progressFooterText}>
-            {stats.averageFormScore >= 90
-              ? 'Great consistency! Keep it up.'
-              : 'Keep practicing to refine joint alignment.'}
-          </Text>
-        </View>
+        </ScrollView>
       </ScrollView>
-
-      {/* Floating Settings/Action Button */}
-      <TouchableOpacity
-        style={styles.floatingSettingsButton}
-        onPress={onNavigateToProfile}
-        activeOpacity={0.85}
-      >
-        <Ionicons name="settings" size={22} color="#FFFFFF" />
-      </TouchableOpacity>
     </SafeAreaView>
   );
 };
@@ -247,246 +220,199 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 const styles = StyleSheet.create({
   safeContainer: {
     flex: 1,
-    backgroundColor: '#0B132B',
+    backgroundColor: Theme.colors.background,
   },
   scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 40,
+    paddingHorizontal: Theme.spacing.lg,
+    paddingTop: Theme.spacing.md,
+    paddingBottom: Theme.spacing.xxxl,
   },
-  topHeaderRow: {
+  headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
-  },
-  greetingSub: {
-    color: '#94A3B8',
-    fontSize: 14,
-    fontWeight: '500',
-    marginBottom: 2,
+    marginBottom: Theme.spacing.lg,
   },
   greetingTitle: {
-    color: '#F8FAFC',
-    fontSize: 26,
+    fontSize: Theme.typography.sizes.xl,
     fontWeight: '800',
+    color: Theme.colors.textPrimary,
     letterSpacing: -0.5,
   },
-  avatarButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#1E293B',
-    justifyContent: 'center',
+  greetingSub: {
+    fontSize: Theme.typography.sizes.sm,
+    color: Theme.colors.textSecondary,
+    marginTop: 2,
+  },
+  profileAvatarButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Theme.colors.lightGreen,
     alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: 'rgba(31, 107, 79, 0.15)',
   },
-  heroCard: {
-    backgroundColor: '#162238',
-    borderRadius: 24,
-    padding: 20,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 6,
+  heroCardContainer: {
+    borderRadius: Theme.borderRadius.xl,
+    overflow: 'hidden',
+    marginBottom: Theme.spacing.lg,
+    ...Theme.shadows.card,
   },
-  heroTopRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 20,
+  heroBackground: {
+    width: '100%',
+    height: 210,
   },
-  heroTextContainer: {
+  heroBackgroundImage: {
+    borderRadius: Theme.borderRadius.xl,
+  },
+  heroOverlay: {
     flex: 1,
-    paddingRight: 12,
+    backgroundColor: 'rgba(28, 28, 26, 0.45)',
+    padding: Theme.spacing.lg,
+    justifyContent: 'space-between',
+  },
+  heroTagBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: Theme.borderRadius.full,
+  },
+  heroTagText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1,
   },
   heroTitle: {
-    color: '#F8FAFC',
-    fontSize: 22,
+    fontSize: Theme.typography.sizes.xxl,
     fontWeight: '800',
-    lineHeight: 28,
-    marginBottom: 6,
-  },
-  heroSubtitle: {
-    color: '#94A3B8',
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  heroIconCircle: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.3)',
-  },
-  startWorkoutHeroButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#10B981',
-    borderRadius: 22,
-    paddingVertical: 14,
-    shadowColor: '#10B981',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  startWorkoutHeroButtonText: {
     color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '800',
-    letterSpacing: 0.3,
+    lineHeight: 32,
+    letterSpacing: -0.5,
   },
-  statsRow: {
+  startWorkoutButton: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: 24,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: '#162238',
-    borderRadius: 20,
-    padding: 16,
     alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    justifyContent: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: Theme.colors.primaryGreen,
+    paddingHorizontal: Theme.spacing.lg,
+    paddingVertical: Theme.spacing.sm + 2,
+    borderRadius: Theme.borderRadius.lg,
+    ...Theme.shadows.soft,
   },
-  statIcon: {
-    marginBottom: 8,
+  startWorkoutButtonText: {
+    color: '#FFFFFF',
+    fontSize: Theme.typography.sizes.base,
+    fontWeight: '700',
   },
-  statNumber: {
-    color: '#F8FAFC',
-    fontSize: 24,
-    fontWeight: '800',
-    marginBottom: 2,
+  metricsRow: {
+    flexDirection: 'row',
+    gap: Theme.spacing.md,
+    marginBottom: Theme.spacing.xl,
   },
-  statLabel: {
-    color: '#64748B',
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0.8,
+  metricCard: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Theme.colors.surface,
+    padding: Theme.spacing.base,
+    borderRadius: Theme.borderRadius.lg,
+    borderWidth: 1,
+    borderColor: Theme.colors.borderSubtle,
+    gap: 12,
+    ...Theme.shadows.soft,
+  },
+  metricIconCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: Theme.colors.surfaceSecondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  metricValue: {
+    fontSize: Theme.typography.sizes.base,
+    fontWeight: '700',
+    color: Theme.colors.textPrimary,
+  },
+  metricLabel: {
+    fontSize: Theme.typography.sizes.xs,
+    color: Theme.colors.textSecondary,
+    marginTop: 1,
   },
   sectionHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 14,
+    marginBottom: Theme.spacing.md,
   },
   sectionTitle: {
-    color: '#F8FAFC',
-    fontSize: 18,
+    fontSize: Theme.typography.sizes.lg,
     fontWeight: '800',
+    color: Theme.colors.textPrimary,
+    letterSpacing: -0.3,
   },
-  seeAllText: {
-    color: '#10B981',
-    fontSize: 13,
+  sectionSeeAll: {
+    fontSize: Theme.typography.sizes.sm,
+    color: Theme.colors.primaryGreen,
+    fontWeight: '600',
+  },
+  quickStartScroll: {
+    gap: Theme.spacing.md,
+    paddingBottom: Theme.spacing.base,
+  },
+  quickCard: {
+    width: 170,
+    backgroundColor: Theme.colors.surface,
+    borderRadius: Theme.borderRadius.lg,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: Theme.colors.borderSubtle,
+    ...Theme.shadows.soft,
+  },
+  quickCardImage: {
+    width: '100%',
+    height: 110,
+    backgroundColor: Theme.colors.surfaceSecondary,
+  },
+  quickCardContent: {
+    padding: Theme.spacing.md,
+  },
+  quickCardTitle: {
+    fontSize: Theme.typography.sizes.base,
     fontWeight: '700',
+    color: Theme.colors.textPrimary,
   },
-  quickWorkoutsList: {
-    gap: 12,
-    marginBottom: 24,
+  quickCardSubtitle: {
+    fontSize: Theme.typography.sizes.xs,
+    color: Theme.colors.textSecondary,
+    marginTop: 2,
   },
-  quickWorkoutCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#162238',
-    borderRadius: 18,
-    padding: 14,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
-  },
-  exerciseIconBox: {
-    width: 46,
-    height: 46,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 14,
-  },
-  exerciseTextColumn: {
-    flex: 1,
-  },
-  exerciseNameText: {
-    color: '#F8FAFC',
-    fontSize: 16,
-    fontWeight: '700',
-    marginBottom: 2,
-  },
-  exerciseCategoryText: {
-    color: '#94A3B8',
-    fontSize: 12,
-  },
-  playButtonCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: '#10B981',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  weeklyProgressCard: {
-    backgroundColor: '#162238',
-    borderRadius: 20,
-    padding: 18,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    marginBottom: 10,
-  },
-  progressHeaderRow: {
+  quickCardBottomRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginTop: Theme.spacing.sm,
   },
-  progressTitle: {
-    color: '#F8FAFC',
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  progressPercentText: {
-    color: '#10B981',
-    fontSize: 18,
-    fontWeight: '800',
-  },
-  progressBarTrack: {
-    height: 8,
-    backgroundColor: '#1E293B',
-    borderRadius: 4,
-    overflow: 'hidden',
-    marginBottom: 10,
-  },
-  progressBarFill: {
-    height: '100%',
-    backgroundColor: '#10B981',
+  quickCardDiff: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: Theme.colors.primaryGreen,
+    backgroundColor: Theme.colors.lightGreen,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
     borderRadius: 4,
   },
-  progressFooterText: {
-    color: '#94A3B8',
-    fontSize: 12,
-  },
-  floatingSettingsButton: {
-    position: 'absolute',
-    bottom: 20,
-    right: 20,
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#2563EB',
-    justifyContent: 'center',
+  playArrowCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: Theme.colors.primaryGreen,
     alignItems: 'center',
-    shadowColor: '#2563EB',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 8,
+    justifyContent: 'center',
   },
 });

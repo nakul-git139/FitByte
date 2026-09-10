@@ -2,7 +2,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const https = require('https');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'fitbyte-super-secret-jwt-key-2026-production';
+const JWT_SECRET = process.env.JWT_SECRET || 'fitpilot-super-secret-jwt-key-2026-production';
 const JWT_EXPIRES_IN = '7d';
 
 /**

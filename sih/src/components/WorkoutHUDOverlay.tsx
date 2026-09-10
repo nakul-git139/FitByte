@@ -12,6 +12,11 @@ interface WorkoutHUDOverlayProps {
   selectedExercise: string;
   showPoseSkeleton: boolean;
   targetReps?: number;
+  currentSet?: number;
+  totalSets?: number;
+  isResting?: boolean;
+  restSecondsRemaining?: number;
+  onSkipRest?: () => void;
   phase?: ExercisePhase;
   kneeAngle?: number;
   elbowAngle?: number;
@@ -43,6 +48,11 @@ export const WorkoutHUDOverlay: React.FC<WorkoutHUDOverlayProps> = ({
   selectedExercise,
   showPoseSkeleton,
   targetReps,
+  currentSet = 1,
+  totalSets = 3,
+  isResting = false,
+  restSecondsRemaining = 45,
+  onSkipRest,
   phase = 'IDLE',
   kneeAngle = 0,
   elbowAngle = 0,
@@ -519,6 +529,14 @@ export const WorkoutHUDOverlay: React.FC<WorkoutHUDOverlayProps> = ({
                 </Text>
               </View>
 
+              {/* Set Progress Badge */}
+              <View style={styles.setPill}>
+                <Ionicons name="layers" size={11} color="#38BDF8" />
+                <Text style={styles.setPillText}>
+                  SET {currentSet || 1} / {totalSets || 3}
+                </Text>
+              </View>
+
               {/* Good & Bad Rep Breakdown Badges */}
               <View style={styles.heroRepStatsRow}>
                 <View style={styles.goodRepPill}>
@@ -572,6 +590,52 @@ export const WorkoutHUDOverlay: React.FC<WorkoutHUDOverlayProps> = ({
           <View style={[styles.cornerMarker, styles.topRightCorner]} />
           <View style={[styles.cornerMarker, styles.bottomLeftCorner]} />
           <View style={[styles.cornerMarker, styles.bottomRightCorner]} />
+        </View>
+      )}
+
+      {/* 6. REST TIMER & NEXT SET OVERLAY (Appears between sets) */}
+      {isResting && (
+        <View style={styles.restOverlayContainer} pointerEvents="box-none">
+          <View style={styles.restCard}>
+            <View style={styles.restHeaderPill}>
+              <Ionicons name="timer" size={14} color="#F59E0B" />
+              <Text style={styles.restHeaderPillText}>REST & RECOVERY</Text>
+            </View>
+
+            <Text style={styles.restSetTitle}>
+              Set {currentSet || 1} of {totalSets || 3} Done!
+            </Text>
+            <Text style={styles.restSetSubtitle}>
+              {currentSet && totalSets && currentSet < totalSets
+                ? `Take a quick breath before starting Set ${(currentSet || 1) + 1}.`
+                : 'Final recovery interval.'}
+            </Text>
+
+            {/* Countdown Badge */}
+            <View style={styles.restCountdownRing}>
+              <Text style={styles.restCountdownNumber}>
+                {restSecondsRemaining ?? 45}
+              </Text>
+              <Text style={styles.restCountdownUnit}>SECONDS</Text>
+            </View>
+
+            {/* Action CTA to Skip Rest or Start Next Set */}
+            {onSkipRest && (
+              <TouchableOpacity
+                style={styles.startNextSetButton}
+                activeOpacity={0.85}
+                onPress={onSkipRest}
+              >
+                <Ionicons name="play" size={18} color="#FFFFFF" />
+                <Text style={styles.startNextSetButtonText}>
+                  {currentSet && totalSets && currentSet < totalSets
+                    ? `Start Set ${(currentSet || 1) + 1} of ${totalSets} Now`
+                    : 'Start Next Set'}
+                </Text>
+                <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       )}
     </View>
@@ -1045,5 +1109,133 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     flexShrink: 1,
+  },
+  setPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(56, 189, 248, 0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(56, 189, 248, 0.3)',
+    marginTop: 2,
+    marginBottom: 4,
+  },
+  setPillText: {
+    color: '#38BDF8',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  restOverlayContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(15, 23, 42, 0.85)',
+    zIndex: 100,
+    paddingHorizontal: 20,
+  },
+  restCard: {
+    width: '100%',
+    maxWidth: 340,
+    backgroundColor: '#1E293B',
+    borderRadius: 24,
+    padding: 24,
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: 'rgba(245, 158, 11, 0.4)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.5,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  restHeaderPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.3)',
+  },
+  restHeaderPillText: {
+    color: '#F59E0B',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+  },
+  restSetTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#F8FAFC',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  restSetSubtitle: {
+    fontSize: 13,
+    color: '#94A3B8',
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 18,
+  },
+  restCountdownRing: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+    borderWidth: 3,
+    borderColor: '#F59E0B',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 24,
+    shadowColor: '#F59E0B',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  restCountdownNumber: {
+    fontSize: 32,
+    fontWeight: '900',
+    color: '#F8FAFC',
+  },
+  restCountdownUnit: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#F59E0B',
+    letterSpacing: 0.8,
+    marginTop: -2,
+  },
+  startNextSetButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#10B981',
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    width: '100%',
+    gap: 8,
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  startNextSetButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '800',
+    letterSpacing: 0.3,
   },
 });

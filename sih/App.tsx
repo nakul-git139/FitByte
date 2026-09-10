@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, ActivityIndicator } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { SplashScreen } from './src/components/SplashScreen';
+import { OnboardingScreen } from './src/components/OnboardingScreen';
 import { AuthScreen } from './src/components/AuthScreen';
 import { HomeScreen } from './src/components/HomeScreen';
 import { ChooseWorkoutScreen } from './src/components/ChooseWorkoutScreen';
@@ -11,18 +13,27 @@ import { ProfileScreen } from './src/components/ProfileScreen';
 import { BottomNavBar, MainTabType } from './src/components/BottomNavBar';
 import { DailyMoodCheckInScreen } from './src/components/DailyMoodCheckInScreen';
 import { TodaysWorkoutScreen } from './src/components/TodaysWorkoutScreen';
+import { WorkoutReadyScreen } from './src/components/WorkoutReadyScreen';
 import { WorkoutCameraScreen } from './src/components/WorkoutCameraScreen';
 
 import { AuthService } from './src/services/authService';
 import { User } from './src/types/auth';
 import { MoodCheckInData } from './src/types/mood';
 import { GeneratedWorkout } from './src/types/aiWorkout';
+import { Theme } from './src/config/theme';
 
-type AppView = 'auth' | 'tabs' | 'mood-checkin' | 'todays-workout' | 'workout-camera';
+type AppView =
+  | 'splash'
+  | 'onboarding'
+  | 'auth'
+  | 'tabs'
+  | 'mood-checkin'
+  | 'todays-workout'
+  | 'workout-ready'
+  | 'workout-camera';
 
 export default function App() {
-  const [currentView, setCurrentView] = useState<AppView>('auth');
-  const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
+  const [currentView, setCurrentView] = useState<AppView>('splash');
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [activeTab, setActiveTab] = useState<MainTabType>('home');
   const [checkInData, setCheckInData] = useState<MoodCheckInData | null>(null);
@@ -36,19 +47,24 @@ export default function App() {
       .then((user) => {
         if (user) {
           setCurrentUser(user);
-          setCurrentView('tabs');
-        } else {
-          setCurrentView('auth');
         }
       })
       .catch((err) => {
         console.warn('[App] Error restoring auth session:', err);
-        setCurrentView('auth');
-      })
-      .finally(() => {
-        setIsAuthLoading(false);
       });
   }, []);
+
+  const handleSplashFinish = () => {
+    if (currentUser) {
+      setCurrentView('tabs');
+    } else {
+      setCurrentView('onboarding');
+    }
+  };
+
+  const handleOnboardingGetStarted = () => {
+    setCurrentView('auth');
+  };
 
   const handleAuthSuccess = (user: User) => {
     setCurrentUser(user);
@@ -67,7 +83,7 @@ export default function App() {
     setCurrentView('auth');
   };
 
-  // Triggered from Home "Start Workout" button or Choose Workout "Continue"
+  // Triggered from Home "Start Workout" button
   const handleStartDailyFlow = (exerciseName?: string, targetReps?: number) => {
     if (exerciseName) {
       setSelectedExercise(exerciseName);
@@ -78,11 +94,11 @@ export default function App() {
     setCurrentView('mood-checkin');
   };
 
-  // Quick Play directly launches workout camera with chosen exercise
+  // Quick Play directly navigates to Workout Ready screen
   const handleQuickLaunchExercise = (exerciseName: string, targetReps?: number) => {
     setSelectedExercise(exerciseName);
     setSelectedTargetReps(targetReps);
-    setCurrentView('workout-camera');
+    setCurrentView('workout-ready');
   };
 
   // Completed mood check-in (Gemini generated workout)
@@ -102,7 +118,7 @@ export default function App() {
     setCurrentView('todays-workout');
   };
 
-  // Start workout from Today's Workout screen
+  // Start workout from Today's Workout screen -> Goes to Workout Ready preview
   const handleStartFromWorkoutPlan = (exerciseName?: string, targetReps?: number) => {
     if (exerciseName) {
       setSelectedExercise(exerciseName);
@@ -110,6 +126,11 @@ export default function App() {
     if (targetReps) {
       setSelectedTargetReps(targetReps);
     }
+    setCurrentView('workout-ready');
+  };
+
+  // Start workout from Workout Ready -> Launches camera
+  const handleLaunchCameraWorkout = () => {
     setCurrentView('workout-camera');
   };
 
@@ -130,21 +151,21 @@ export default function App() {
     setCurrentView('tabs');
   };
 
-  if (isAuthLoading) {
-    return (
-      <SafeAreaProvider>
-        <View style={[styles.container, styles.loadingContainer]}>
-          <StatusBar style="light" />
-          <ActivityIndicator size="large" color="#10B981" />
-        </View>
-      </SafeAreaProvider>
-    );
-  }
-
   return (
     <SafeAreaProvider>
       <View style={styles.container}>
-        <StatusBar style="light" />
+        <StatusBar style={currentView === 'workout-camera' ? 'light' : 'dark'} />
+
+        {currentView === 'splash' && (
+          <SplashScreen onFinish={handleSplashFinish} />
+        )}
+
+        {currentView === 'onboarding' && (
+          <OnboardingScreen
+            onGetStarted={handleOnboardingGetStarted}
+            onSignIn={() => setCurrentView('auth')}
+          />
+        )}
 
         {currentView === 'auth' && (
           <AuthScreen
@@ -168,7 +189,10 @@ export default function App() {
             {activeTab === 'workout' && (
               <ChooseWorkoutScreen
                 initialExercise={selectedExercise}
-                onSelectExerciseAndContinue={(exercise) => handleStartDailyFlow(exercise)}
+                onSelectExerciseAndContinue={(exercise) => {
+                  setSelectedExercise(exercise);
+                  setCurrentView('workout-ready');
+                }}
                 onBack={() => setActiveTab('home')}
                 onOpenSettings={() => setActiveTab('profile')}
               />
@@ -216,6 +240,19 @@ export default function App() {
           />
         )}
 
+        {currentView === 'workout-ready' && (
+          <WorkoutReadyScreen
+            exerciseName={selectedExercise}
+            targetReps={selectedTargetReps}
+            onStartWorkout={handleLaunchCameraWorkout}
+            onChangeExercise={() => {
+              setActiveTab('workout');
+              setCurrentView('tabs');
+            }}
+            onBack={() => handleReturnToTabs()}
+          />
+        )}
+
         {currentView === 'workout-camera' && (
           <WorkoutCameraScreen
             initialExercise={selectedExercise}
@@ -233,15 +270,10 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0A0F1D',
-  },
-  loadingContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: Theme.colors.background,
   },
   tabContentContainer: {
     flex: 1,
-    backgroundColor: '#0A0F1D',
+    backgroundColor: Theme.colors.background,
   },
 });
-

@@ -15,31 +15,26 @@ import { MoodType, MoodOption, MoodCheckInData } from '../types/mood';
 import { GeneratedWorkout } from '../types/aiWorkout';
 import { WorkoutAiService } from '../services/workoutAiService';
 import { StorageService } from '../services/storageService';
+import { Theme } from '../config/theme';
 
 const MOOD_OPTIONS: MoodOption[] = [
-  { type: 'Great', emoji: '😊', label: 'Great', description: 'Feeling awesome & strong' },
-  { type: 'Good', emoji: '🙂', label: 'Good', description: 'Positive & ready to move' },
-  { type: 'Okay', emoji: '😐', label: 'Okay', description: 'Balanced & steady' },
-  { type: 'Tired', emoji: '😴', label: 'Tired', description: 'Need gentle pacing' },
-  { type: 'Low Energy', emoji: '😓', label: 'Low Energy', description: 'Light recovery focus' },
-  { type: 'Stressed', emoji: '😤', label: 'Stressed', description: 'Release tension & sweat' },
-  { type: 'Motivated', emoji: '🔥', label: 'Motivated', description: 'Ready to crush it' },
+  { type: 'Great', emoji: '😊', label: 'Great', description: 'Feeling strong & energized' },
+  { type: 'Okay', emoji: '😐', label: 'Okay', description: 'Balanced & steady pace' },
+  { type: 'Tired', emoji: '😴', label: 'Tired', description: 'Gentle recovery & mobility' },
 ];
 
-const ENERGY_LEVELS = [
-  { level: 1, label: 'Low', desc: 'Relaxed' },
-  { level: 2, label: 'Mild', desc: 'Light' },
-  { level: 3, label: 'Moderate', desc: 'Steady' },
-  { level: 4, label: 'High', desc: 'Energetic' },
-  { level: 5, label: 'Peak', desc: 'Max Power' },
+const SECONDARY_MOODS: MoodOption[] = [
+  { type: 'Motivated', emoji: '🔥', label: 'Motivated', description: 'Ready to crush it' },
+  { type: 'Stressed', emoji: '😤', label: 'Stressed', description: 'Release tension & sweat' },
+  { type: 'Low Energy', emoji: '😓', label: 'Low Energy', description: 'Light movement' },
 ];
 
 const DURATION_PRESETS = [
-  { minutes: 10, label: '10 min', tag: 'Express' },
-  { minutes: 15, label: '15 min', tag: 'Quick' },
-  { minutes: 20, label: '20 min', tag: 'Standard' },
-  { minutes: 30, label: '30 min', tag: 'Full' },
-  { minutes: 45, label: '45 min', tag: 'Extended' },
+  { minutes: 15, label: '15 min' },
+  { minutes: 20, label: '20 min' },
+  { minutes: 25, label: '25 min' },
+  { minutes: 30, label: '30 min' },
+  { minutes: 45, label: '45 min' },
 ];
 
 interface DailyMoodCheckInScreenProps {
@@ -51,17 +46,18 @@ interface DailyMoodCheckInScreenProps {
 }
 
 export const DailyMoodCheckInScreen: React.FC<DailyMoodCheckInScreenProps> = ({
-  initialMood,
-  initialEnergy = 3,
+  initialMood = 'Great',
+  initialEnergy = 4,
   onSubmitCheckIn,
   onSkip,
   onBack,
 }) => {
-  const [selectedMood, setSelectedMood] = useState<MoodType | null>(initialMood || null);
+  const [selectedMood, setSelectedMood] = useState<MoodType>(initialMood);
   const [energyLevel, setEnergyLevel] = useState<number>(initialEnergy);
-  const [durationMinutes, setDurationMinutes] = useState<number>(20);
+  const [durationMinutes, setDurationMinutes] = useState<number>(25);
   const [isCustomDuration, setIsCustomDuration] = useState<boolean>(false);
   const [customInputText, setCustomInputText] = useState<string>('25');
+  const [showMoreMoods, setShowMoreMoods] = useState<boolean>(false);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [historySummary, setHistorySummary] = useState<{
     averageFormScore: number;
@@ -79,18 +75,14 @@ export const DailyMoodCheckInScreen: React.FC<DailyMoodCheckInScreenProps> = ({
   const handleSelectMood = (mood: MoodType) => {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    } catch {
-      // Fallback
-    }
+    } catch {}
     setSelectedMood(mood);
   };
 
   const handleSelectEnergy = (level: number) => {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    } catch {
-      // Fallback
-    }
+    } catch {}
     setEnergyLevel(level);
   };
 
@@ -100,38 +92,7 @@ export const DailyMoodCheckInScreen: React.FC<DailyMoodCheckInScreenProps> = ({
     } catch {}
     setIsCustomDuration(false);
     setDurationMinutes(mins);
-  };
-
-  const handleSelectCustomTab = () => {
-    try {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    } catch {}
-    setIsCustomDuration(true);
-    const parsed = parseInt(customInputText, 10);
-    const valid = isNaN(parsed) || parsed < 5 ? 25 : Math.min(120, parsed);
-    setDurationMinutes(valid);
-  };
-
-  const handleStepDuration = (delta: number) => {
-    try {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    } catch {}
-    const current = durationMinutes || 20;
-    const nextVal = Math.max(5, Math.min(120, current + delta));
-    setDurationMinutes(nextVal);
-    setCustomInputText(String(nextVal));
-  };
-
-  const handleCustomTextChange = (text: string) => {
-    // Only allow digits
-    const cleaned = text.replace(/[^0-9]/g, '');
-    setCustomInputText(cleaned);
-    if (cleaned.length > 0) {
-      const num = parseInt(cleaned, 10);
-      if (!isNaN(num) && num > 0) {
-        setDurationMinutes(Math.max(5, Math.min(120, num)));
-      }
-    }
+    setCustomInputText(String(mins));
   };
 
   const handleCreateWorkout = async () => {
@@ -139,12 +100,11 @@ export const DailyMoodCheckInScreen: React.FC<DailyMoodCheckInScreenProps> = ({
 
     try {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch {
-      // Fallback
-    }
+    } catch {}
 
-    const safeDurationMinutes = Math.max(5, Math.min(120, Number(durationMinutes) || 20));
-    const moodObj = MOOD_OPTIONS.find((m) => m.type === selectedMood);
+    const safeDurationMinutes = Math.max(5, Math.min(120, Number(durationMinutes) || 25));
+    const allOptions = [...MOOD_OPTIONS, ...SECONDARY_MOODS];
+    const moodObj = allOptions.find((m) => m.type === selectedMood);
     const checkInData: MoodCheckInData = {
       mood: selectedMood,
       emoji: moodObj ? moodObj.emoji : '😊',
@@ -156,24 +116,32 @@ export const DailyMoodCheckInScreen: React.FC<DailyMoodCheckInScreenProps> = ({
     setIsGenerating(true);
 
     try {
-      const generatedWorkout = await WorkoutAiService.generateDailyWorkout(checkInData, {
-        duration: `${safeDurationMinutes} mins`,
-        workoutHistory: historySummary?.historySummaryText,
-        previousFormScores: historySummary
-          ? `Average form score: ${historySummary.averageFormScore}% across ${historySummary.totalSessions} sessions. Last exercise: ${historySummary.lastExercise}`
-          : undefined,
+      const generated = await WorkoutAiService.generateDailyWorkout(checkInData, {
+        workoutHistory: historySummary?.historySummaryText || undefined,
+        previousFormScores: historySummary?.averageFormScore ? `Average form score: ${historySummary.averageFormScore}%` : undefined,
       });
 
       setIsGenerating(false);
-      onSubmitCheckIn(checkInData, generatedWorkout);
-    } catch (err) {
-      console.warn('[DailyMoodCheckInScreen] Workout generation error:', err);
+      onSubmitCheckIn(checkInData, generated);
+    } catch (e) {
+      console.warn('[DailyMoodCheckInScreen] Error generating workout:', e);
       setIsGenerating(false);
-      onSubmitCheckIn(checkInData);
+      // Fallback structured plan
+      onSubmitCheckIn(checkInData, {
+        workoutName: `${selectedMood} Energy Flow`,
+        durationMinutes: safeDurationMinutes,
+        difficulty: energyLevel >= 4 ? 'intense' : energyLevel >= 3 ? 'moderate' : 'light',
+        reason: `Personalized ${safeDurationMinutes}-min routine matching your ${selectedMood.toLowerCase()} state and energy level ${energyLevel}/5.`,
+        exercises: [
+          { name: 'Push-ups', sets: 3, reps: energyLevel >= 4 ? 12 : 10, restSeconds: 45 },
+          { name: 'Bodyweight Squats', sets: 3, reps: energyLevel >= 4 ? 15 : 12, restSeconds: 45 },
+          { name: 'Plank Hold', sets: 3, reps: energyLevel >= 4 ? 45 : 30, restSeconds: 45 },
+        ],
+      });
     }
   };
 
-  const isButtonEnabled = selectedMood !== null && !isGenerating;
+  const allDisplayedMoods = showMoreMoods ? [...MOOD_OPTIONS, ...SECONDARY_MOODS] : MOOD_OPTIONS;
 
   return (
     <SafeAreaView style={styles.safeContainer}>
@@ -181,361 +149,154 @@ export const DailyMoodCheckInScreen: React.FC<DailyMoodCheckInScreenProps> = ({
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Top Nav Row */}
-        {onBack && (
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={onBack}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="arrow-back" size={22} color="#E2E8F0" />
-          </TouchableOpacity>
-        )}
-
-        {/* Header Badge & Title */}
-        <View style={styles.headerSection}>
-          <View style={styles.badgePill}>
-            <Ionicons name="sparkles" size={14} color="#10B981" />
-            <Text style={styles.badgeText}>GEMINI ADAPTIVE COACH</Text>
-          </View>
-
-          {historySummary && historySummary.totalSessions > 0 && (
-            <View style={styles.historyBadgeRow}>
-              <Ionicons name="trophy-outline" size={13} color="#38BDF8" />
-              <Text style={styles.historyBadgeText}>
-                Session #{historySummary.totalSessions + 1} • Past Avg Form: {historySummary.averageFormScore}%
-              </Text>
-            </View>
+        {/* Header Row */}
+        <View style={styles.headerRow}>
+          {onBack && (
+            <TouchableOpacity style={styles.backButton} onPress={onBack} activeOpacity={0.7}>
+              <Ionicons name="arrow-back" size={20} color={Theme.colors.textPrimary} />
+            </TouchableOpacity>
           )}
 
-          <Text style={styles.mainTitle}>How are you feeling today?</Text>
-          <Text style={styles.subtitle}>
-            Select your mood, energy level, and exercise time so Gemini can customize today's workout.
-          </Text>
-        </View>
-
-        {/* Mood Selection Grid */}
-        <View style={styles.sectionContainer}>
-          <Text style={styles.sectionLabel}>CHOOSE YOUR MOOD</Text>
-          <View style={styles.moodGrid}>
-            {MOOD_OPTIONS.map((item) => {
-              const isSelected = selectedMood === item.type;
-              return (
-                <TouchableOpacity
-                  key={item.type}
-                  style={[
-                    styles.moodCard,
-                    isSelected && styles.moodCardSelected,
-                  ]}
-                  onPress={() => handleSelectMood(item.type)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.moodEmoji}>{item.emoji}</Text>
-                  <View style={styles.moodTextContainer}>
-                    <Text
-                      style={[
-                        styles.moodLabel,
-                        isSelected && styles.moodLabelSelected,
-                      ]}
-                    >
-                      {item.label}
-                    </Text>
-                    <Text style={styles.moodDesc}>{item.description}</Text>
-                  </View>
-                  {isSelected && (
-                    <View style={styles.selectedCheckIcon}>
-                      <Ionicons name="checkmark-circle" size={18} color="#10B981" />
-                    </View>
-                  )}
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
-
-        {/* Energy Level Scale (1 to 5) */}
-        <View style={styles.sectionContainer}>
-          <View style={styles.energyHeaderRow}>
-            <Text style={styles.sectionLabel}>HOW IS YOUR ENERGY?</Text>
-            <Text style={styles.energyValueText}>
-              Level {energyLevel}/5 • {ENERGY_LEVELS[energyLevel - 1]?.label}
-            </Text>
-          </View>
-
-          <View style={styles.energySelectorRow}>
-            {ENERGY_LEVELS.map((item) => {
-              const isSelected = energyLevel === item.level;
-              return (
-                <TouchableOpacity
-                  key={item.level}
-                  style={[
-                    styles.energyButton,
-                    isSelected && styles.energyButtonSelected,
-                  ]}
-                  onPress={() => handleSelectEnergy(item.level)}
-                  activeOpacity={0.7}
-                >
-                  <Text
-                    style={[
-                      styles.energyNumber,
-                      isSelected && styles.energyNumberSelected,
-                    ]}
-                  >
-                    {item.level}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.energyButtonLabel,
-                      isSelected && styles.energyButtonLabelSelected,
-                    ]}
-                  >
-                    {item.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
-
-        {/* Workout Duration Section */}
-        <View style={styles.sectionContainer}>
-          <View style={styles.energyHeaderRow}>
-            <Text style={styles.sectionLabel}>WORKOUT DURATION</Text>
-            <Text style={styles.durationValueText}>
-              ⏱️ {durationMinutes} mins
-            </Text>
-          </View>
-
-          {/* Duration Presets + Custom Button Grid */}
-          <View style={styles.durationGrid}>
-            <View style={styles.durationRow}>
-              {DURATION_PRESETS.slice(0, 3).map((item) => {
-                const isSelected = !isCustomDuration && durationMinutes === item.minutes;
-                return (
-                  <TouchableOpacity
-                    key={item.minutes}
-                    style={[
-                      styles.durationButton,
-                      isSelected && styles.durationButtonSelected,
-                    ]}
-                    onPress={() => handleSelectPreset(item.minutes)}
-                    activeOpacity={0.7}
-                  >
-                    <Text
-                      style={[
-                        styles.durationTimeText,
-                        isSelected && styles.durationTimeTextSelected,
-                      ]}
-                    >
-                      {item.label}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.durationTagText,
-                        isSelected && styles.durationTagTextSelected,
-                      ]}
-                    >
-                      {item.tag}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            <View style={styles.durationRow}>
-              {DURATION_PRESETS.slice(3, 5).map((item) => {
-                const isSelected = !isCustomDuration && durationMinutes === item.minutes;
-                return (
-                  <TouchableOpacity
-                    key={item.minutes}
-                    style={[
-                      styles.durationButton,
-                      isSelected && styles.durationButtonSelected,
-                    ]}
-                    onPress={() => handleSelectPreset(item.minutes)}
-                    activeOpacity={0.7}
-                  >
-                    <Text
-                      style={[
-                        styles.durationTimeText,
-                        isSelected && styles.durationTimeTextSelected,
-                      ]}
-                    >
-                      {item.label}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.durationTagText,
-                        isSelected && styles.durationTagTextSelected,
-                      ]}
-                    >
-                      {item.tag}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-
-              {/* Custom Duration Button */}
-              <TouchableOpacity
-                style={[
-                  styles.durationButton,
-                  isCustomDuration && styles.durationButtonSelected,
-                ]}
-                onPress={handleSelectCustomTab}
-                activeOpacity={0.7}
-              >
-                <Text
-                  style={[
-                    styles.durationTimeText,
-                    isCustomDuration && styles.durationTimeTextSelected,
-                  ]}
-                >
-                  Custom
-                </Text>
-                <Text
-                  style={[
-                    styles.durationTagText,
-                    isCustomDuration && styles.durationTagTextSelected,
-                  ]}
-                >
-                  ⚙️ Set mins
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Custom Time Control Card */}
-          {isCustomDuration && (
-            <View style={styles.customDurationCard}>
-              <View style={styles.customCardHeader}>
-                <Ionicons name="time-outline" size={16} color="#10B981" />
-                <Text style={styles.customCardTitle}>CUSTOM WORKOUT TIME</Text>
-              </View>
-
-              <View style={styles.stepperContainer}>
-                {/* Decrement Button */}
-                <TouchableOpacity
-                  style={styles.stepperButton}
-                  onPress={() => handleStepDuration(-5)}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons name="remove" size={20} color="#F1F5F9" />
-                </TouchableOpacity>
-
-                {/* Direct Number Input */}
-                <View style={styles.numericInputWrapper}>
-                  <TextInput
-                    style={styles.numericTextInput}
-                    value={customInputText}
-                    onChangeText={handleCustomTextChange}
-                    keyboardType="number-pad"
-                    maxLength={3}
-                    placeholder="20"
-                    placeholderTextColor="#64748B"
-                    selectTextOnFocus
-                  />
-                  <Text style={styles.numericUnitText}>MINS</Text>
-                </View>
-
-                {/* Increment Button */}
-                <TouchableOpacity
-                  style={styles.stepperButton}
-                  onPress={() => handleStepDuration(5)}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons name="add" size={20} color="#F1F5F9" />
-                </TouchableOpacity>
-              </View>
-
-              {/* Quick Preset Badges for Custom */}
-              <View style={styles.customQuickChipsRow}>
-                {[5, 12, 25, 40, 60].map((mins) => (
-                  <TouchableOpacity
-                    key={mins}
-                    style={[
-                      styles.quickChip,
-                      durationMinutes === mins && styles.quickChipActive,
-                    ]}
-                    onPress={() => {
-                      try {
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      } catch {}
-                      setDurationMinutes(mins);
-                      setCustomInputText(String(mins));
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <Text
-                      style={[
-                        styles.quickChipText,
-                        durationMinutes === mins && styles.quickChipTextActive,
-                      ]}
-                    >
-                      {mins}m
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              <Text style={styles.customHelperText}>
-                Type any duration between 5 and 120 minutes. Gemini will calibrate reps and sets accordingly.
-              </Text>
-            </View>
-          )}
-        </View>
-
-        {/* Bottom CTA Button: Create My Workout */}
-        <View style={styles.footerSection}>
-          <TouchableOpacity
-            style={[
-              styles.createWorkoutButton,
-              !isButtonEnabled && styles.createWorkoutButtonDisabled,
-            ]}
-            onPress={handleCreateWorkout}
-            disabled={!isButtonEnabled}
-            activeOpacity={0.85}
-          >
-            {isGenerating ? (
-              <View style={styles.generatingRow}>
-                <ActivityIndicator size="small" color="#FFFFFF" />
-                <Text style={styles.createWorkoutButtonText}>
-                  Gemini is crafting workout...
-                </Text>
-              </View>
-            ) : (
-              <>
-                <Ionicons
-                  name="flash"
-                  size={20}
-                  color={isButtonEnabled ? '#FFFFFF' : '#64748B'}
-                />
-                <Text
-                  style={[
-                    styles.createWorkoutButtonText,
-                    !isButtonEnabled && styles.createWorkoutButtonTextDisabled,
-                  ]}
-                >
-                  Create My Workout
-                </Text>
-                <Ionicons
-                  name="arrow-forward"
-                  size={18}
-                  color={isButtonEnabled ? '#FFFFFF' : '#64748B'}
-                />
-              </>
-            )}
-          </TouchableOpacity>
-
-          {onSkip && !isGenerating && (
-            <TouchableOpacity
-              style={styles.skipButton}
-              onPress={onSkip}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.skipButtonText}>Skip for now</Text>
+          {onSkip && (
+            <TouchableOpacity style={styles.skipButton} onPress={onSkip} activeOpacity={0.7}>
+              <Text style={styles.skipButtonText}>Skip</Text>
             </TouchableOpacity>
           )}
         </View>
+
+        {/* Title Section */}
+        <View style={styles.titleSection}>
+          <Text style={styles.mainTitle}>How are you feeling today?</Text>
+          <Text style={styles.subtitle}>
+            Your check-in helps FitPilot recommend a better workout for you.
+          </Text>
+        </View>
+
+        {/* 1. Mood Cards (😊 Great, 😐 Okay, 😴 Tired) */}
+        <View style={styles.moodGrid}>
+          {allDisplayedMoods.map((option) => {
+            const isSelected = selectedMood === option.type;
+            return (
+              <TouchableOpacity
+                key={option.type}
+                style={[
+                  styles.moodCard,
+                  isSelected && styles.moodCardSelected,
+                ]}
+                onPress={() => handleSelectMood(option.type)}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.moodEmoji}>{option.emoji}</Text>
+                <Text style={[styles.moodLabel, isSelected && styles.moodLabelSelected]}>
+                  {option.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {/* More Moods Toggle */}
+        <TouchableOpacity
+          style={styles.moreMoodsButton}
+          onPress={() => setShowMoreMoods((prev) => !prev)}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.moreMoodsText}>
+            {showMoreMoods ? 'Show fewer moods' : 'More mood options'}
+          </Text>
+          <Ionicons
+            name={showMoreMoods ? 'chevron-up' : 'chevron-down'}
+            size={14}
+            color={Theme.colors.primaryGreen}
+          />
+        </TouchableOpacity>
+
+        {/* 2. Energy Slider (Low ───●─── High) */}
+        <View style={styles.sectionCard}>
+          <View style={styles.cardHeaderRow}>
+            <Text style={styles.sectionLabel}>How's your energy?</Text>
+            <Text style={styles.energyValueText}>{energyLevel} / 5</Text>
+          </View>
+
+          <View style={styles.energySelector}>
+            {[1, 2, 3, 4, 5].map((lvl) => {
+              const isActive = energyLevel >= lvl;
+              const isCurrent = energyLevel === lvl;
+              return (
+                <TouchableOpacity
+                  key={`energy-${lvl}`}
+                  style={[
+                    styles.energyStep,
+                    isActive && styles.energyStepActive,
+                    isCurrent && styles.energyStepCurrent,
+                  ]}
+                  onPress={() => handleSelectEnergy(lvl)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.energyStepNumber, isActive && styles.energyStepNumberActive]}>
+                    {lvl}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          <View style={styles.energyLabelsRow}>
+            <Text style={styles.energyLabelSub}>Low</Text>
+            <Text style={styles.energyLabelSub}>Moderate</Text>
+            <Text style={styles.energyLabelSub}>High</Text>
+          </View>
+        </View>
+
+        {/* 3. Duration Selector */}
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionLabel}>Workout Duration</Text>
+          <View style={styles.presetRow}>
+            {DURATION_PRESETS.map((preset) => {
+              const isSelected = !isCustomDuration && durationMinutes === preset.minutes;
+              return (
+                <TouchableOpacity
+                  key={preset.minutes}
+                  style={[
+                    styles.presetPill,
+                    isSelected && styles.presetPillSelected,
+                  ]}
+                  onPress={() => handleSelectPreset(preset.minutes)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.presetText, isSelected && styles.presetTextSelected]}>
+                    {preset.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
+        {/* 4. Empathetic Coach Quote */}
+        <View style={styles.coachQuoteCard}>
+          <Ionicons name="chatbubble-ellipses-outline" size={18} color={Theme.colors.primaryGreen} style={{ marginTop: 2 }} />
+          <Text style={styles.coachQuoteText}>
+            “Let's find the right workout for today.”
+          </Text>
+        </View>
+
+        {/* Action Button */}
+        <TouchableOpacity
+          style={styles.continueButton}
+          onPress={handleCreateWorkout}
+          disabled={isGenerating}
+          activeOpacity={0.85}
+        >
+          {isGenerating ? (
+            <ActivityIndicator size="small" color="#FFFFFF" />
+          ) : (
+            <>
+              <Text style={styles.continueButtonText}>Continue</Text>
+              <Ionicons name="arrow-forward" size={18} color="#FFFFFF" style={{ marginLeft: 6 }} />
+            </>
+          )}
+        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );
@@ -544,354 +305,212 @@ export const DailyMoodCheckInScreen: React.FC<DailyMoodCheckInScreenProps> = ({
 const styles = StyleSheet.create({
   safeContainer: {
     flex: 1,
-    backgroundColor: '#0F172A',
+    backgroundColor: Theme.colors.background,
   },
   scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 36,
+    paddingHorizontal: Theme.spacing.lg,
+    paddingTop: Theme.spacing.sm,
+    paddingBottom: Theme.spacing.xxxl,
   },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#1E293B',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  headerSection: {
-    marginBottom: 24,
-  },
-  badgePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(16, 185, 129, 0.12)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    alignSelf: 'flex-start',
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.3)',
-    gap: 6,
-  },
-  badgeText: {
-    color: '#10B981',
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 1.2,
-  },
-  historyBadgeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(56, 189, 248, 0.1)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    alignSelf: 'flex-start',
-    marginBottom: 12,
-    gap: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(56, 189, 248, 0.25)',
-  },
-  historyBadgeText: {
-    color: '#38BDF8',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  mainTitle: {
-    color: '#F8FAFC',
-    fontSize: 28,
-    fontWeight: '800',
-    letterSpacing: -0.5,
-    marginBottom: 8,
-  },
-  subtitle: {
-    color: '#94A3B8',
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  sectionContainer: {
-    marginBottom: 28,
-  },
-  sectionLabel: {
-    color: '#94A3B8',
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 1.2,
-    marginBottom: 12,
-  },
-  moodGrid: {
-    gap: 10,
-  },
-  moodCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#1E293B',
-    borderRadius: 16,
-    padding: 14,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
-  },
-  moodCardSelected: {
-    borderColor: '#10B981',
-    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-  },
-  moodEmoji: {
-    fontSize: 26,
-    marginRight: 14,
-  },
-  moodTextContainer: {
-    flex: 1,
-  },
-  moodLabel: {
-    color: '#F1F5F9',
-    fontSize: 16,
-    fontWeight: '700',
-    marginBottom: 2,
-  },
-  moodLabelSelected: {
-    color: '#10B981',
-  },
-  moodDesc: {
-    color: '#64748B',
-    fontSize: 12,
-  },
-  selectedCheckIcon: {
-    marginLeft: 8,
-  },
-  energyHeaderRow: {
+  headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: Theme.spacing.md,
   },
-  energyValueText: {
-    color: '#38BDF8',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  energySelectorRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  energyButton: {
-    flex: 1,
-    backgroundColor: '#1E293B',
-    borderRadius: 14,
-    paddingVertical: 12,
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
-  },
-  energyButtonSelected: {
-    borderColor: '#38BDF8',
-    backgroundColor: 'rgba(56, 189, 248, 0.12)',
-  },
-  energyNumber: {
-    color: '#94A3B8',
-    fontSize: 18,
-    fontWeight: '800',
-    marginBottom: 2,
-  },
-  energyNumberSelected: {
-    color: '#38BDF8',
-  },
-  energyButtonLabel: {
-    color: '#64748B',
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  energyButtonLabelSelected: {
-    color: '#38BDF8',
-  },
-  durationValueText: {
-    color: '#10B981',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  durationGrid: {
-    gap: 8,
-  },
-  durationRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  durationButton: {
-    flex: 1,
-    backgroundColor: '#1E293B',
-    borderRadius: 14,
-    paddingVertical: 10,
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
-  },
-  durationButtonSelected: {
-    borderColor: '#10B981',
-    backgroundColor: 'rgba(16, 185, 129, 0.12)',
-  },
-  durationTimeText: {
-    color: '#94A3B8',
-    fontSize: 13,
-    fontWeight: '800',
-    marginBottom: 2,
-  },
-  durationTimeTextSelected: {
-    color: '#10B981',
-  },
-  durationTagText: {
-    color: '#64748B',
-    fontSize: 9,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  durationTagTextSelected: {
-    color: '#10B981',
-  },
-  customDurationCard: {
-    backgroundColor: 'rgba(30, 41, 59, 0.95)',
-    borderRadius: 16,
-    padding: 14,
-    marginTop: 10,
-    borderWidth: 1.5,
-    borderColor: 'rgba(16, 185, 129, 0.35)',
-  },
-  customCardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 12,
-  },
-  customCardTitle: {
-    color: '#10B981',
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0.8,
-  },
-  stepperContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 16,
-    marginBottom: 12,
-  },
-  stepperButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#334155',
+  backButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Theme.colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  numericInputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    backgroundColor: '#0F172A',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: '#10B981',
-    gap: 6,
-    minWidth: 110,
-    justifyContent: 'center',
-  },
-  numericTextInput: {
-    color: '#FFFFFF',
-    fontSize: 24,
-    fontWeight: '800',
-    textAlign: 'center',
-    minWidth: 44,
-  },
-  numericUnitText: {
-    color: '#10B981',
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  customQuickChipsRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 8,
-    marginBottom: 10,
-  },
-  quickChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 10,
-    backgroundColor: '#0F172A',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  quickChipActive: {
-    borderColor: '#10B981',
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
-  },
-  quickChipText: {
-    color: '#94A3B8',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  quickChipTextActive: {
-    color: '#10B981',
-  },
-  customHelperText: {
-    color: '#64748B',
-    fontSize: 11,
-    textAlign: 'center',
-    lineHeight: 16,
-  },
-  footerSection: {
-    marginTop: 8,
-    gap: 12,
-  },
-  createWorkoutButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#10B981',
-    borderRadius: 16,
-    paddingVertical: 16,
-    gap: 10,
-    shadowColor: '#10B981',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  createWorkoutButtonDisabled: {
-    backgroundColor: '#1E293B',
-    shadowOpacity: 0,
-    elevation: 0,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.05)',
-  },
-  createWorkoutButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '800',
-    letterSpacing: 0.3,
-  },
-  createWorkoutButtonTextDisabled: {
-    color: '#64748B',
-  },
-  generatingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
+    borderColor: Theme.colors.borderSubtle,
   },
   skipButton: {
-    alignItems: 'center',
-    paddingVertical: 8,
+    marginLeft: 'auto',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
   },
   skipButtonText: {
-    color: '#64748B',
-    fontSize: 13,
+    fontSize: Theme.typography.sizes.sm,
+    color: Theme.colors.textSecondary,
     fontWeight: '600',
+  },
+  titleSection: {
+    marginBottom: Theme.spacing.xl,
+  },
+  mainTitle: {
+    fontSize: Theme.typography.sizes.xxl,
+    fontWeight: '800',
+    color: Theme.colors.textPrimary,
+    letterSpacing: -0.5,
+  },
+  subtitle: {
+    fontSize: Theme.typography.sizes.base,
+    color: Theme.colors.textSecondary,
+    marginTop: 6,
+    lineHeight: 22,
+  },
+  moodGrid: {
+    flexDirection: 'row',
+    gap: Theme.spacing.md,
+    marginBottom: Theme.spacing.md,
+  },
+  moodCard: {
+    flex: 1,
+    backgroundColor: Theme.colors.surface,
+    paddingVertical: Theme.spacing.lg,
+    borderRadius: Theme.borderRadius.lg,
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: Theme.colors.borderSubtle,
+    ...Theme.shadows.soft,
+  },
+  moodCardSelected: {
+    borderColor: Theme.colors.primaryGreen,
+    backgroundColor: Theme.colors.lightGreen,
+  },
+  moodEmoji: {
+    fontSize: 34,
+    marginBottom: 8,
+  },
+  moodLabel: {
+    fontSize: Theme.typography.sizes.base,
+    fontWeight: '700',
+    color: Theme.colors.textPrimary,
+  },
+  moodLabelSelected: {
+    color: Theme.colors.primaryGreenDark,
+  },
+  moreMoodsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingVertical: Theme.spacing.xs,
+    marginBottom: Theme.spacing.lg,
+  },
+  moreMoodsText: {
+    fontSize: Theme.typography.sizes.xs,
+    color: Theme.colors.primaryGreen,
+    fontWeight: '600',
+  },
+  sectionCard: {
+    backgroundColor: Theme.colors.surface,
+    padding: Theme.spacing.base,
+    borderRadius: Theme.borderRadius.lg,
+    borderWidth: 1,
+    borderColor: Theme.colors.borderSubtle,
+    marginBottom: Theme.spacing.md,
+    ...Theme.shadows.soft,
+  },
+  cardHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Theme.spacing.md,
+  },
+  sectionLabel: {
+    fontSize: Theme.typography.sizes.sm,
+    fontWeight: '700',
+    color: Theme.colors.textPrimary,
+  },
+  energyValueText: {
+    fontSize: Theme.typography.sizes.sm,
+    fontWeight: '700',
+    color: Theme.colors.primaryGreen,
+  },
+  energySelector: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 8,
+  },
+  energyStep: {
+    flex: 1,
+    height: 44,
+    borderRadius: Theme.borderRadius.md,
+    backgroundColor: Theme.colors.surfaceSecondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  energyStepActive: {
+    backgroundColor: Theme.colors.lightGreen,
+  },
+  energyStepCurrent: {
+    backgroundColor: Theme.colors.primaryGreen,
+  },
+  energyStepNumber: {
+    fontSize: Theme.typography.sizes.base,
+    fontWeight: '700',
+    color: Theme.colors.textSecondary,
+  },
+  energyStepNumberActive: {
+    color: '#FFFFFF',
+  },
+  energyLabelsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 4,
+  },
+  energyLabelSub: {
+    fontSize: 11,
+    color: Theme.colors.textMuted,
+    fontWeight: '500',
+  },
+  presetRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 8,
+  },
+  presetPill: {
+    paddingHorizontal: Theme.spacing.md,
+    paddingVertical: Theme.spacing.sm,
+    borderRadius: Theme.borderRadius.full,
+    backgroundColor: Theme.colors.surfaceSecondary,
+  },
+  presetPillSelected: {
+    backgroundColor: Theme.colors.primaryGreen,
+  },
+  presetText: {
+    fontSize: Theme.typography.sizes.xs,
+    fontWeight: '600',
+    color: Theme.colors.textSecondary,
+  },
+  presetTextSelected: {
+    color: '#FFFFFF',
+  },
+  coachQuoteCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: Theme.colors.lightGreen,
+    padding: Theme.spacing.base,
+    borderRadius: Theme.borderRadius.lg,
+    marginVertical: Theme.spacing.md,
+  },
+  coachQuoteText: {
+    fontSize: Theme.typography.sizes.sm,
+    color: Theme.colors.primaryGreenDark,
+    fontWeight: '600',
+    flex: 1,
+    fontStyle: 'italic',
+  },
+  continueButton: {
+    backgroundColor: Theme.colors.primaryGreen,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: Theme.spacing.base,
+    borderRadius: Theme.borderRadius.lg,
+    marginTop: Theme.spacing.sm,
+    ...Theme.shadows.elevated,
+  },
+  continueButtonText: {
+    color: '#FFFFFF',
+    fontSize: Theme.typography.sizes.md,
+    fontWeight: '700',
   },
 });

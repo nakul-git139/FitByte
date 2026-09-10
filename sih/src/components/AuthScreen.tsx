@@ -9,7 +9,6 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
-  Alert,
   Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -17,6 +16,8 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { AuthService } from '../services/authService';
 import { User } from '../types/auth';
+import { FitPilotLogo } from './FitPilotLogo';
+import { Theme } from '../config/theme';
 
 interface AuthScreenProps {
   onAuthSuccess: (user: User) => void;
@@ -29,6 +30,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
   onAuthSuccess,
   onContinueAsGuest,
 }) => {
+  const [showEmailForm, setShowEmailForm] = useState<boolean>(false);
   const [mode, setMode] = useState<AuthMode>('login');
   const [name, setName] = useState<string>('');
   const [email, setEmail] = useState<string>('');
@@ -141,11 +143,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
   };
 
   const handleGoogleSignIn = () => {
-    // If user already typed an email into the input field, sign in with it immediately
     if (email.trim().length > 0 && email.includes('@')) {
       executeGoogleAuth(email, name);
     } else {
-      // Prompt modal to enter/pick their exact Gmail address
       setGoogleEmailInput(email.trim());
       setGoogleNameInput(name.trim());
       setShowGoogleModal(true);
@@ -170,169 +170,189 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {/* App Branding Header */}
+          {/* FitPilot Brand Header */}
           <View style={styles.brandHeader}>
-            <View style={styles.logoBadge}>
-              <Ionicons name="barbell" size={28} color="#10B981" />
-            </View>
-            <Text style={styles.brandTitle}>FitByte</Text>
-            <Text style={styles.brandTagline}>AI Computer Vision & Real-Time Coaching</Text>
+            <FitPilotLogo size="medium" />
+            <Text style={styles.welcomeTitle}>Welcome Back</Text>
+            <Text style={styles.welcomeSubtitle}>
+              Continue your fitness journey.
+            </Text>
           </View>
 
-          {/* Mode Segmented Switcher */}
-          <View style={styles.modeContainer}>
-            <TouchableOpacity
-              style={[styles.modeTab, mode === 'login' && styles.modeTabActive]}
-              onPress={() => handleTabSwitch('login')}
-              activeOpacity={0.8}
-            >
-              <Text style={[styles.modeTabText, mode === 'login' && styles.modeTabTextActive]}>
-                Sign In
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.modeTab, mode === 'register' && styles.modeTabActive]}
-              onPress={() => handleTabSwitch('register')}
-              activeOpacity={0.8}
-            >
-              <Text style={[styles.modeTabText, mode === 'register' && styles.modeTabTextActive]}>
-                Create Account
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Error Message Banner */}
+          {/* Error Message Pill */}
           {errorMessage && (
-            <View style={styles.errorBanner}>
-              <Ionicons name="alert-circle" size={18} color="#EF4444" />
-              <Text style={styles.errorBannerText}>{errorMessage}</Text>
+            <View style={styles.errorPill}>
+              <Ionicons name="alert-circle" size={16} color={Theme.colors.error} />
+              <Text style={styles.errorText}>{errorMessage}</Text>
             </View>
           )}
 
-          {/* Form Fields */}
-          <View style={styles.formCard}>
-            {mode === 'register' && (
+          {/* Primary Authentication Buttons */}
+          <View style={styles.authButtonsContainer}>
+            {/* 1. Continue with Google */}
+            <TouchableOpacity
+              style={styles.socialAuthButton}
+              onPress={handleGoogleSignIn}
+              disabled={isGoogleLoading}
+              activeOpacity={0.8}
+            >
+              {isGoogleLoading ? (
+                <ActivityIndicator size="small" color={Theme.colors.primaryGreen} />
+              ) : (
+                <>
+                  <Ionicons name="logo-google" size={18} color="#EA4335" style={{ marginRight: 10 }} />
+                  <Text style={styles.socialAuthButtonText}>Continue with Google</Text>
+                </>
+              )}
+            </TouchableOpacity>
+
+            {/* 2. Continue as Guest */}
+            <TouchableOpacity
+              style={styles.guestAuthButton}
+              onPress={handleGuest}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="person-outline" size={18} color={Theme.colors.textPrimary} style={{ marginRight: 10 }} />
+              <Text style={styles.guestAuthButtonText}>Continue as Guest</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Clean Divider */}
+          <View style={styles.dividerRow}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>OR</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          {/* 3. Sign in with Email Toggle / Collapsible Form */}
+          {!showEmailForm ? (
+            <TouchableOpacity
+              style={styles.emailToggleCard}
+              onPress={() => setShowEmailForm(true)}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="mail-outline" size={18} color={Theme.colors.textSecondary} style={{ marginRight: 10 }} />
+              <Text style={styles.emailToggleText}>Sign in with Email</Text>
+              <Ionicons name="chevron-forward" size={16} color={Theme.colors.textMuted} style={{ marginLeft: 'auto' }} />
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.emailFormCard}>
+              {/* Tab Selector: Login vs Register */}
+              <View style={styles.tabSelector}>
+                <TouchableOpacity
+                  style={[styles.tabButton, mode === 'login' && styles.tabButtonActive]}
+                  onPress={() => handleTabSwitch('login')}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.tabButtonText, mode === 'login' && styles.tabButtonTextActive]}>
+                    Sign In
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.tabButton, mode === 'register' && styles.tabButtonActive]}
+                  onPress={() => handleTabSwitch('register')}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.tabButtonText, mode === 'register' && styles.tabButtonTextActive]}>
+                    Create Account
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Name Input (Register mode only) */}
+              {mode === 'register' && (
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Full Name</Text>
+                  <View style={styles.inputWrapper}>
+                    <Ionicons name="person-outline" size={18} color={Theme.colors.textSecondary} style={styles.inputIcon} />
+                    <TextInput
+                      style={styles.input}
+                      placeholder="e.g. Alex Rivera"
+                      placeholderTextColor={Theme.colors.textMuted}
+                      value={name}
+                      onChangeText={setName}
+                      autoCapitalize="words"
+                    />
+                  </View>
+                </View>
+              )}
+
+              {/* Email Input */}
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>FULL NAME</Text>
-                <View style={styles.inputContainer}>
-                  <Ionicons name="person-outline" size={18} color="#64748B" style={styles.inputIcon} />
+                <Text style={styles.inputLabel}>Email Address</Text>
+                <View style={styles.inputWrapper}>
+                  <Ionicons name="mail-outline" size={18} color={Theme.colors.textSecondary} style={styles.inputIcon} />
                   <TextInput
-                    style={styles.textInput}
-                    placeholder="e.g. Alex Hunter"
-                    placeholderTextColor="#64748B"
-                    value={name}
-                    onChangeText={setName}
-                    autoCapitalize="words"
+                    style={styles.input}
+                    placeholder="alex@example.com"
+                    placeholderTextColor={Theme.colors.textMuted}
+                    value={email}
+                    onChangeText={setEmail}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
                     autoCorrect={false}
                   />
                 </View>
               </View>
-            )}
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>EMAIL ADDRESS</Text>
-              <View style={styles.inputContainer}>
-                <Ionicons name="mail-outline" size={18} color="#64748B" style={styles.inputIcon} />
-                <TextInput
-                  style={styles.textInput}
-                  placeholder="name@example.com"
-                  placeholderTextColor="#64748B"
-                  value={email}
-                  onChangeText={setEmail}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-              </View>
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>PASSWORD</Text>
-              <View style={styles.inputContainer}>
-                <Ionicons name="lock-closed-outline" size={18} color="#64748B" style={styles.inputIcon} />
-                <TextInput
-                  style={styles.textInput}
-                  placeholder="At least 6 characters"
-                  placeholderTextColor="#64748B"
-                  value={password}
-                  onChangeText={setPassword}
-                  secureTextEntry={!showPassword}
-                  autoCapitalize="none"
-                />
-                <TouchableOpacity
-                  onPress={() => setShowPassword(!showPassword)}
-                  style={styles.eyeButton}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                >
-                  <Ionicons
-                    name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                    size={18}
-                    color="#64748B"
+              {/* Password Input */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Password</Text>
+                <View style={styles.inputWrapper}>
+                  <Ionicons name="lock-closed-outline" size={18} color={Theme.colors.textSecondary} style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="••••••••"
+                    placeholderTextColor={Theme.colors.textMuted}
+                    value={password}
+                    onChangeText={setPassword}
+                    secureTextEntry={!showPassword}
+                    autoCapitalize="none"
                   />
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {/* Submit Action Button */}
-            <TouchableOpacity
-              style={[styles.primaryButton, isLoading && styles.primaryButtonDisabled]}
-              onPress={handleSubmit}
-              disabled={isLoading}
-              activeOpacity={0.85}
-            >
-              {isLoading ? (
-                <ActivityIndicator size="small" color="#0A0F1D" />
-              ) : (
-                <>
-                  <Text style={styles.primaryButtonText}>
-                    {mode === 'login' ? 'Sign In' : 'Create Account'}
-                  </Text>
-                  <Ionicons name="arrow-forward" size={18} color="#0A0F1D" />
-                </>
-              )}
-            </TouchableOpacity>
-          </View>
-
-          {/* Social Divider */}
-          <View style={styles.dividerRow}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>OR CONTINUE WITH</Text>
-            <View style={styles.dividerLine} />
-          </View>
-
-          {/* Google Sign In Button */}
-          <TouchableOpacity
-            style={[styles.googleButton, isGoogleLoading && styles.googleButtonDisabled]}
-            onPress={handleGoogleSignIn}
-            disabled={isGoogleLoading}
-            activeOpacity={0.85}
-          >
-            {isGoogleLoading ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <>
-                <View style={styles.googleIconCircle}>
-                  <Ionicons name="logo-google" size={18} color="#EA4335" />
+                  <TouchableOpacity
+                    onPress={() => setShowPassword((prev) => !prev)}
+                    style={styles.passwordToggle}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons
+                      name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                      size={18}
+                      color={Theme.colors.textSecondary}
+                    />
+                  </TouchableOpacity>
                 </View>
-                <Text style={styles.googleButtonText}>Continue with Google</Text>
-              </>
-            )}
-          </TouchableOpacity>
+              </View>
 
-          {/* Guest Mode Link */}
-          <TouchableOpacity
-            style={styles.guestButton}
-            onPress={handleGuest}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.guestButtonText}>Continue as Guest</Text>
-            <Ionicons name="chevron-forward" size={14} color="#94A3B8" />
-          </TouchableOpacity>
+              {/* Submit Button */}
+              <TouchableOpacity
+                style={styles.submitButton}
+                onPress={handleSubmit}
+                disabled={isLoading}
+                activeOpacity={0.85}
+              >
+                {isLoading ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.submitButtonText}>
+                    {mode === 'login' ? 'Sign In to FitPilot' : 'Create Account'}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Legal / Terms Footer */}
+          <View style={styles.legalFooter}>
+            <Text style={styles.legalText}>
+              By continuing, you agree to our{' '}
+              <Text style={styles.legalLink}>Terms of Service</Text> and{' '}
+              <Text style={styles.legalLink}>Privacy Policy</Text>.
+            </Text>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Google Account Picker / Sign-In Modal */}
+      {/* Google Sign-In Input Modal */}
       <Modal
         visible={showGoogleModal}
         transparent={true}
@@ -341,68 +361,62 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.modalOverlay}
+          style={styles.googleModalOverlay}
         >
-          <View style={styles.modalCard}>
-            <View style={styles.modalGoogleHeader}>
-              <View style={styles.googleIconCircleLarge}>
-                <Ionicons name="logo-google" size={26} color="#EA4335" />
-              </View>
-              <Text style={styles.modalTitle}>Sign in with Google</Text>
-              <Text style={styles.modalSubtitle}>
-                Enter your Google account to connect with FitByte
-              </Text>
+          <View style={styles.googleModalCard}>
+            <View style={styles.googleModalHeader}>
+              <Ionicons name="logo-google" size={24} color="#EA4335" />
+              <Text style={styles.googleModalTitle}>Sign in with Google</Text>
+              <TouchableOpacity
+                onPress={() => setShowGoogleModal(false)}
+                style={styles.googleModalClose}
+              >
+                <Ionicons name="close" size={20} color={Theme.colors.textSecondary} />
+              </TouchableOpacity>
             </View>
 
-            <View style={styles.modalInputGroup}>
-              <Text style={styles.modalInputLabel}>YOUR GMAIL ADDRESS</Text>
-              <View style={styles.inputContainer}>
-                <Ionicons name="mail-outline" size={18} color="#EA4335" style={styles.inputIcon} />
+            <Text style={styles.googleModalSubtitle}>
+              Connect your Google account with FitPilot to personalize workouts and track progress.
+            </Text>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Google Account Name</Text>
+              <View style={styles.inputWrapper}>
+                <Ionicons name="person-outline" size={18} color={Theme.colors.textSecondary} style={styles.inputIcon} />
                 <TextInput
-                  style={styles.textInput}
-                  placeholder="e.g. yourname@gmail.com"
-                  placeholderTextColor="#64748B"
+                  style={styles.input}
+                  placeholder="e.g. Alex Rivera"
+                  placeholderTextColor={Theme.colors.textMuted}
+                  value={googleNameInput}
+                  onChangeText={setGoogleNameInput}
+                  autoCapitalize="words"
+                />
+              </View>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Gmail Address</Text>
+              <View style={styles.inputWrapper}>
+                <Ionicons name="mail-outline" size={18} color={Theme.colors.textSecondary} style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="alex.athlete@gmail.com"
+                  placeholderTextColor={Theme.colors.textMuted}
                   value={googleEmailInput}
                   onChangeText={setGoogleEmailInput}
                   keyboardType="email-address"
                   autoCapitalize="none"
                   autoCorrect={false}
-                  autoFocus={true}
-                />
-              </View>
-            </View>
-
-            <View style={styles.modalInputGroup}>
-              <Text style={styles.modalInputLabel}>DISPLAY NAME (OPTIONAL)</Text>
-              <View style={styles.inputContainer}>
-                <Ionicons name="person-outline" size={18} color="#64748B" style={styles.inputIcon} />
-                <TextInput
-                  style={styles.textInput}
-                  placeholder="e.g. Alex Hunter"
-                  placeholderTextColor="#64748B"
-                  value={googleNameInput}
-                  onChangeText={setGoogleNameInput}
-                  autoCapitalize="words"
-                  autoCorrect={false}
                 />
               </View>
             </View>
 
             <TouchableOpacity
-              style={styles.modalSubmitButton}
+              style={styles.googleConfirmButton}
               onPress={() => executeGoogleAuth(googleEmailInput, googleNameInput)}
               activeOpacity={0.85}
             >
-              <Text style={styles.modalSubmitButtonText}>Sign In with Google</Text>
-              <Ionicons name="arrow-forward" size={16} color="#0A0F1D" />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.modalCancelButton}
-              onPress={() => setShowGoogleModal(false)}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.modalCancelButtonText}>Cancel</Text>
+              <Text style={styles.googleConfirmButtonText}>Continue with Account</Text>
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
@@ -414,288 +428,260 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
 const styles = StyleSheet.create({
   safeContainer: {
     flex: 1,
-    backgroundColor: '#0A0F1D',
+    backgroundColor: Theme.colors.background,
   },
   keyboardAvoid: {
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 22,
-    paddingTop: 24,
-    paddingBottom: 40,
+    flexGrow: 1,
+    paddingHorizontal: Theme.spacing.xl,
+    paddingTop: Theme.spacing.xxl,
+    paddingBottom: Theme.spacing.xl,
+    justifyContent: 'center',
   },
   brandHeader: {
     alignItems: 'center',
-    marginBottom: 28,
+    marginBottom: Theme.spacing.xxl,
   },
-  logoBadge: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: 'rgba(16, 185, 129, 0.12)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(16, 185, 129, 0.3)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 14,
-  },
-  brandTitle: {
-    color: '#F8FAFC',
-    fontSize: 28,
+  welcomeTitle: {
+    fontSize: Theme.typography.sizes.xxl,
     fontWeight: '800',
+    color: Theme.colors.textPrimary,
+    marginTop: Theme.spacing.md,
     letterSpacing: -0.5,
-    marginBottom: 4,
   },
-  brandTagline: {
-    color: '#94A3B8',
-    fontSize: 13,
-    fontWeight: '500',
+  welcomeSubtitle: {
+    fontSize: Theme.typography.sizes.base,
+    color: Theme.colors.textSecondary,
+    marginTop: 4,
+    fontWeight: '400',
   },
-  modeContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#1E293B',
-    borderRadius: 14,
-    padding: 4,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
-  },
-  modeTab: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: 'center',
-    borderRadius: 10,
-  },
-  modeTabActive: {
-    backgroundColor: '#10B981',
-  },
-  modeTabText: {
-    color: '#94A3B8',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  modeTabTextActive: {
-    color: '#0A0F1D',
-    fontWeight: '700',
-  },
-  errorBanner: {
+  errorPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(239, 68, 68, 0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(239, 68, 68, 0.3)',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    marginBottom: 16,
     gap: 8,
+    backgroundColor: Theme.colors.errorLight,
+    paddingHorizontal: Theme.spacing.base,
+    paddingVertical: Theme.spacing.sm,
+    borderRadius: Theme.borderRadius.md,
+    marginBottom: Theme.spacing.base,
+    borderWidth: 1,
+    borderColor: 'rgba(220, 38, 38, 0.2)',
   },
-  errorBannerText: {
-    color: '#EF4444',
-    fontSize: 13,
-    fontWeight: '600',
+  errorText: {
+    color: Theme.colors.error,
+    fontSize: Theme.typography.sizes.sm,
+    fontWeight: '500',
     flex: 1,
   },
-  formCard: {
-    backgroundColor: '#131D33',
-    borderRadius: 20,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    marginBottom: 22,
+  authButtonsContainer: {
+    gap: Theme.spacing.md,
   },
-  inputGroup: {
-    marginBottom: 16,
-  },
-  inputLabel: {
-    color: '#94A3B8',
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.8,
-    marginBottom: 8,
-  },
-  inputContainer: {
+  socialAuthButton: {
     flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#0F172A',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    paddingHorizontal: 12,
-    height: 48,
-  },
-  inputIcon: {
-    marginRight: 10,
-  },
-  textInput: {
-    flex: 1,
-    color: '#F8FAFC',
-    fontSize: 14,
-  },
-  eyeButton: {
-    padding: 4,
-  },
-  primaryButton: {
-    flexDirection: 'row',
-    backgroundColor: '#10B981',
-    borderRadius: 14,
-    height: 50,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 8,
-    gap: 8,
+    backgroundColor: Theme.colors.surface,
+    paddingVertical: Theme.spacing.base,
+    borderRadius: Theme.borderRadius.lg,
+    borderWidth: 1,
+    borderColor: Theme.colors.borderSubtle,
+    ...Theme.shadows.soft,
   },
-  primaryButtonDisabled: {
-    opacity: 0.7,
+  socialAuthButtonText: {
+    fontSize: Theme.typography.sizes.md,
+    fontWeight: '600',
+    color: Theme.colors.textPrimary,
   },
-  primaryButtonText: {
-    color: '#0A0F1D',
-    fontSize: 15,
-    fontWeight: '700',
-    letterSpacing: 0.3,
+  guestAuthButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Theme.colors.surfaceSecondary,
+    paddingVertical: Theme.spacing.base,
+    borderRadius: Theme.borderRadius.lg,
+    borderWidth: 1,
+    borderColor: Theme.colors.borderSubtle,
+  },
+  guestAuthButtonText: {
+    fontSize: Theme.typography.sizes.md,
+    fontWeight: '600',
+    color: Theme.colors.textPrimary,
   },
   dividerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
-    gap: 12,
+    marginVertical: Theme.spacing.xl,
   },
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: Theme.colors.borderSubtle,
   },
   dividerText: {
-    color: '#64748B',
-    fontSize: 11,
-    fontWeight: '700',
+    paddingHorizontal: Theme.spacing.base,
+    fontSize: Theme.typography.sizes.xs,
+    fontWeight: '600',
+    color: Theme.colors.textMuted,
     letterSpacing: 1,
   },
-  googleButton: {
+  emailToggleCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#1E293B',
-    borderRadius: 14,
-    height: 50,
+    backgroundColor: Theme.colors.surface,
+    paddingVertical: Theme.spacing.base,
+    paddingHorizontal: Theme.spacing.lg,
+    borderRadius: Theme.borderRadius.lg,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-    marginBottom: 20,
-    gap: 10,
+    borderColor: Theme.colors.borderSubtle,
+    ...Theme.shadows.soft,
   },
-  googleButtonDisabled: {
-    opacity: 0.6,
-  },
-  googleIconCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  googleButtonText: {
-    color: '#F8FAFC',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  guestButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
-    gap: 4,
-  },
-  guestButtonText: {
-    color: '#94A3B8',
-    fontSize: 13,
+  emailToggleText: {
+    fontSize: Theme.typography.sizes.base,
     fontWeight: '600',
+    color: Theme.colors.textPrimary,
   },
-  modalOverlay: {
+  emailFormCard: {
+    backgroundColor: Theme.colors.surface,
+    padding: Theme.spacing.lg,
+    borderRadius: Theme.borderRadius.xl,
+    borderWidth: 1,
+    borderColor: Theme.colors.borderSubtle,
+    ...Theme.shadows.card,
+  },
+  tabSelector: {
+    flexDirection: 'row',
+    backgroundColor: Theme.colors.surfaceSecondary,
+    borderRadius: Theme.borderRadius.md,
+    padding: 3,
+    marginBottom: Theme.spacing.lg,
+  },
+  tabButton: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
-    justifyContent: 'center',
+    paddingVertical: Theme.spacing.sm,
     alignItems: 'center',
-    paddingHorizontal: 20,
+    borderRadius: Theme.borderRadius.sm,
   },
-  modalCard: {
-    width: '100%',
-    maxWidth: 380,
-    backgroundColor: '#162238',
-    borderRadius: 24,
-    padding: 24,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.5,
-    shadowRadius: 20,
-    elevation: 10,
+  tabButtonActive: {
+    backgroundColor: Theme.colors.surface,
+    ...Theme.shadows.soft,
   },
-  modalGoogleHeader: {
-    alignItems: 'center',
-    marginBottom: 20,
+  tabButtonText: {
+    fontSize: Theme.typography.sizes.sm,
+    fontWeight: '500',
+    color: Theme.colors.textSecondary,
   },
-  googleIconCircleLarge: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
-    shadowColor: '#EA4335',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
-    elevation: 3,
-  },
-  modalTitle: {
-    color: '#F8FAFC',
-    fontSize: 20,
-    fontWeight: '800',
-    marginBottom: 4,
-  },
-  modalSubtitle: {
-    color: '#94A3B8',
-    fontSize: 12,
-    textAlign: 'center',
-  },
-  modalInputGroup: {
-    marginBottom: 14,
-  },
-  modalInputLabel: {
-    color: '#94A3B8',
-    fontSize: 10,
+  tabButtonTextActive: {
     fontWeight: '700',
-    letterSpacing: 0.8,
-    marginBottom: 6,
+    color: Theme.colors.primaryGreen,
   },
-  modalSubmitButton: {
+  inputGroup: {
+    marginBottom: Theme.spacing.md,
+  },
+  inputLabel: {
+    fontSize: Theme.typography.sizes.xs,
+    fontWeight: '600',
+    color: Theme.colors.textSecondary,
+    marginBottom: 6,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#10B981',
-    borderRadius: 14,
+    backgroundColor: Theme.colors.surfaceSecondary,
+    borderRadius: Theme.borderRadius.md,
+    borderWidth: 1,
+    borderColor: Theme.colors.borderSubtle,
+    paddingHorizontal: Theme.spacing.md,
+  },
+  inputIcon: {
+    marginRight: 8,
+  },
+  input: {
+    flex: 1,
     height: 48,
-    marginTop: 8,
-    gap: 8,
+    fontSize: Theme.typography.sizes.base,
+    color: Theme.colors.textPrimary,
   },
-  modalSubmitButtonText: {
-    color: '#0A0F1D',
-    fontSize: 14,
-    fontWeight: '700',
+  passwordToggle: {
+    padding: 6,
   },
-  modalCancelButton: {
+  submitButton: {
+    backgroundColor: Theme.colors.primaryGreen,
+    paddingVertical: Theme.spacing.base,
+    borderRadius: Theme.borderRadius.lg,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
-    marginTop: 6,
+    marginTop: Theme.spacing.sm,
+    ...Theme.shadows.elevated,
   },
-  modalCancelButtonText: {
-    color: '#94A3B8',
-    fontSize: 13,
+  submitButtonText: {
+    color: '#FFFFFF',
+    fontSize: Theme.typography.sizes.md,
+    fontWeight: '700',
+  },
+  legalFooter: {
+    marginTop: Theme.spacing.xxl,
+    alignItems: 'center',
+  },
+  legalText: {
+    fontSize: Theme.typography.sizes.xs,
+    color: Theme.colors.textMuted,
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  legalLink: {
+    color: Theme.colors.primaryGreen,
     fontWeight: '600',
+  },
+  googleModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(28, 28, 26, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: Theme.spacing.lg,
+  },
+  googleModalCard: {
+    width: '100%',
+    backgroundColor: Theme.colors.surface,
+    borderRadius: Theme.borderRadius.xl,
+    padding: Theme.spacing.xl,
+    ...Theme.shadows.card,
+  },
+  googleModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Theme.spacing.xs,
+  },
+  googleModalTitle: {
+    fontSize: Theme.typography.sizes.lg,
+    fontWeight: '700',
+    color: Theme.colors.textPrimary,
+    marginLeft: 10,
+    flex: 1,
+  },
+  googleModalClose: {
+    padding: 4,
+  },
+  googleModalSubtitle: {
+    fontSize: Theme.typography.sizes.sm,
+    color: Theme.colors.textSecondary,
+    marginBottom: Theme.spacing.lg,
+    lineHeight: 20,
+  },
+  googleConfirmButton: {
+    backgroundColor: Theme.colors.primaryGreen,
+    paddingVertical: Theme.spacing.base,
+    borderRadius: Theme.borderRadius.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: Theme.spacing.sm,
+  },
+  googleConfirmButtonText: {
+    color: '#FFFFFF',
+    fontSize: Theme.typography.sizes.md,
+    fontWeight: '700',
   },
 });
-

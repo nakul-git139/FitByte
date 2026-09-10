@@ -1,26 +1,26 @@
 {
   "expo": {
-    "name": "Fitness Workout Camera",
-    "slug": "fitness-workout-camera",
+    "name": "FitPilot",
+    "slug": "fitpilot",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "dark",
+    "userInterfaceStyle": "light",
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#0F172A"
+      "backgroundColor": "#F7F6F2"
     },
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSCameraUsageDescription": "Fitness Workout Camera requires access to your camera to track your workout and live movement."
+        "NSCameraUsageDescription": "FitPilot requires access to your camera to track your workout and live movement with real-time AI guidance."
       }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#0F172A"
+        "backgroundColor": "#F7F6F2"
       },
       "permissions": [
         "CAMERA",
@@ -31,8 +31,8 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow Fitness Workout Camera to access your camera to track workouts.",
-          "microphonePermission": "Allow Fitness Workout Camera to access your microphone.",
+          "cameraPermission": "Allow FitPilot to access your camera to track workouts.",
+          "microphonePermission": "Allow FitPilot to access your microphone.",
           "recordAudioAndroid": false
         }
       ],

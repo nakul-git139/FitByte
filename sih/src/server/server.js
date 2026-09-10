@@ -260,7 +260,7 @@ const server = http.createServer(async (req, res) => {
       } else {
         // Create new Google-authenticated user
         user = userStore.createUser({
-          name: googleProfile.name || 'FitByte Athlete',
+          name: googleProfile.name || 'FitPilot Athlete',
           email: googleProfile.email,
           googleId: googleProfile.googleId,
           avatarUrl: googleProfile.avatarUrl,

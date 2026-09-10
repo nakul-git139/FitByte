@@ -72,12 +72,49 @@ export const WorkoutCameraScreen: React.FC<WorkoutCameraScreenProps> = ({
     return 10;
   };
 
+  // Helper to dynamically extract total sets from the mood-generated AI plan
+  const getDynamicSetsCount = (exerciseName: string): number => {
+    if (initialWorkoutPlan?.exercises && initialWorkoutPlan.exercises.length > 0) {
+      const normalizedQuery = exerciseName.toLowerCase().replace(/[^a-z]/g, '');
+      const found = initialWorkoutPlan.exercises.find((ex) => {
+        const normName = ex.name.toLowerCase().replace(/[^a-z]/g, '');
+        return normName.includes(normalizedQuery) || normalizedQuery.includes(normName);
+      });
+      if (found && typeof found.sets === 'number' && found.sets > 0) {
+        return found.sets;
+      }
+    }
+    return 3;
+  };
+
+  // Helper to dynamically extract rest duration in seconds from the mood-generated AI plan
+  const getDynamicRestSeconds = (exerciseName: string): number => {
+    if (initialWorkoutPlan?.exercises && initialWorkoutPlan.exercises.length > 0) {
+      const normalizedQuery = exerciseName.toLowerCase().replace(/[^a-z]/g, '');
+      const found = initialWorkoutPlan.exercises.find((ex) => {
+        const normName = ex.name.toLowerCase().replace(/[^a-z]/g, '');
+        return normName.includes(normalizedQuery) || normalizedQuery.includes(normName);
+      });
+      if (found && typeof found.restSeconds === 'number' && found.restSeconds > 0) {
+        return found.restSeconds;
+      }
+    }
+    return 45;
+  };
+
   const initialExName = initialExercise || initialWorkoutPlan?.exercises?.[0]?.name || 'Pushups';
   const initialTarget = initialTargetReps || getDynamicTargetReps(initialExName);
+  const initialSets = getDynamicSetsCount(initialExName);
 
   const [workoutStatus, setWorkoutStatus] = useState<WorkoutStatus>('idle');
   const [selectedExercise, setSelectedExercise] = useState<string>(initialExName);
   const [showExercisePicker, setShowExercisePicker] = useState<boolean>(false);
+
+  // Multi-set tracking state
+  const [currentSetNumber, setCurrentSetNumber] = useState<number>(1);
+  const [totalSetsCount, setTotalSetsCount] = useState<number>(initialSets);
+  const [isResting, setIsResting] = useState<boolean>(false);
+  const [restSecondsRemaining, setRestSecondsRemaining] = useState<number>(0);
 
   // Helper to resolve active workout routine from Gemini or fallback plan
   const activePlan: GeneratedWorkout = initialWorkoutPlan || {
@@ -168,6 +205,8 @@ export const WorkoutCameraScreen: React.FC<WorkoutCameraScreenProps> = ({
   const [showSummaryModal, setShowSummaryModal] = useState<boolean>(false);
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const restTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const completedSetsHistoryRef = useRef<{ setNumber: number; reps: number; perfectReps: number; formScore: number }[]>([]);
   const previousRepCountRef = useRef<number>(0);
   const previousErrorIdRef = useRef<string | null>(null);
   const geminiObservationsRef = useRef<string[]>([]);
@@ -208,14 +247,33 @@ export const WorkoutCameraScreen: React.FC<WorkoutCameraScreenProps> = ({
     };
   }, [workoutStatus, selectedExercise]);
 
+  // Clean up rest interval on unmount
+  useEffect(() => {
+    return () => {
+      if (restTimerRef.current) {
+        clearInterval(restTimerRef.current);
+      }
+    };
+  }, []);
+
   // Exercise change handler
   useEffect(() => {
     const dynamicTarget = getDynamicTargetReps(selectedExercise);
+    const dynamicSets = getDynamicSetsCount(selectedExercise);
     const engine = ExerciseEngineRegistry.getEngine(selectedExercise);
     engine.reset();
     previousRepCountRef.current = 0;
     previousErrorIdRef.current = null;
     hasAutoCompletedRef.current = false;
+    if (restTimerRef.current) {
+      clearInterval(restTimerRef.current);
+      restTimerRef.current = null;
+    }
+    setIsResting(false);
+    setRestSecondsRemaining(0);
+    setCurrentSetNumber(1);
+    setTotalSetsCount(dynamicSets);
+    completedSetsHistoryRef.current = [];
     setPrimaryFeedback(null);
     setGeminiCoachingTip(null);
     GeminiVisionService.clearCoachingTip();
@@ -224,6 +282,10 @@ export const WorkoutCameraScreen: React.FC<WorkoutCameraScreenProps> = ({
     setStats((prev) => ({
       ...prev,
       targetReps: dynamicTarget,
+      repCount: 0,
+      perfectReps: 0,
+      goodReps: 0,
+      badReps: 0,
     }));
   }, [selectedExercise]);
 
@@ -237,6 +299,102 @@ export const WorkoutCameraScreen: React.FC<WorkoutCameraScreenProps> = ({
     } catch {
       // Fallback
     }
+  };
+
+  // Handle set completion (trigger rest countdown or finish workout)
+  const handleSetCompleted = (reps: number, perfectReps: number, formScore: number) => {
+    triggerHaptic('notification');
+
+    // Record completed set in history
+    completedSetsHistoryRef.current.push({
+      setNumber: currentSetNumber,
+      reps,
+      perfectReps,
+      formScore,
+    });
+
+    if (currentSetNumber < totalSetsCount) {
+      // More sets remaining -> enter rest mode
+      const restDuration = getDynamicRestSeconds(selectedExercise);
+      setIsResting(true);
+      setRestSecondsRemaining(restDuration);
+      setWorkoutStatus('paused');
+
+      SpeechService.speak(
+        `Set ${currentSetNumber} of ${totalSetsCount} completed. Rest for ${restDuration} seconds.`
+      );
+
+      if (restTimerRef.current) {
+        clearInterval(restTimerRef.current);
+      }
+
+      let remaining = restDuration;
+      restTimerRef.current = setInterval(() => {
+        remaining -= 1;
+        if (remaining <= 0) {
+          if (restTimerRef.current) {
+            clearInterval(restTimerRef.current);
+            restTimerRef.current = null;
+          }
+          handleStartNextSet();
+        } else {
+          setRestSecondsRemaining(remaining);
+          if (remaining === 3) {
+            SpeechService.speak('Three');
+          } else if (remaining === 2) {
+            SpeechService.speak('Two');
+          } else if (remaining === 1) {
+            SpeechService.speak('One');
+          }
+        }
+      }, 1000);
+    } else {
+      // All sets completed! Finish the full exercise
+      hasAutoCompletedRef.current = true;
+      handleFinishWorkout();
+    }
+  };
+
+  // Handle advancing to the next set after rest or skip
+  const handleStartNextSet = () => {
+    triggerHaptic('notification');
+    if (restTimerRef.current) {
+      clearInterval(restTimerRef.current);
+      restTimerRef.current = null;
+    }
+    setIsResting(false);
+    setRestSecondsRemaining(0);
+
+    const nextSet = currentSetNumber + 1;
+    setCurrentSetNumber(nextSet);
+
+    // Reset engine for the upcoming set
+    const engine = ExerciseEngineRegistry.getEngine(selectedExercise);
+    engine.reset();
+    previousRepCountRef.current = 0;
+    previousErrorIdRef.current = null;
+    hasAutoCompletedRef.current = false;
+    setPrimaryFeedback(null);
+    setIsGoodForm(true);
+    setHighlightJoints([]);
+
+    // Reset current set rep counts in stats while preserving active duration & calories
+    setStats((prev) => ({
+      ...prev,
+      repCount: 0,
+      perfectReps: 0,
+      goodReps: 0,
+      badReps: 0,
+      formAccuracyScore: 100,
+    }));
+
+    setWorkoutStatus('active');
+
+    const target = stats.targetReps || getDynamicTargetReps(selectedExercise);
+    const isIsometric = selectedExercise.toLowerCase().includes('plank');
+    SpeechService.speak(
+      `Starting Set ${nextSet} of ${totalSetsCount}. Target: ${target} ${isIsometric ? 'seconds' : 'reps'}. Get ready!`
+    );
   };
 
   // Handle Real-Time Computer Vision Data from MediaPipe AI & Local Form Analysis Engine
@@ -311,10 +469,9 @@ export const WorkoutCameraScreen: React.FC<WorkoutCameraScreenProps> = ({
           };
         });
 
-        // Auto-complete workout as soon as target reps or hold duration is achieved
-        if (result.repCount >= currentTarget && currentTarget > 0 && !hasAutoCompletedRef.current) {
-          hasAutoCompletedRef.current = true;
-          handleFinishWorkout(result.repCount, result.perfectReps, result.formAccuracyScore);
+        // Check if current set has hit its target
+        if (result.repCount >= currentTarget && currentTarget > 0 && !hasAutoCompletedRef.current && !isResting) {
+          handleSetCompleted(result.repCount, result.perfectReps, result.formAccuracyScore);
           return;
         }
       }
@@ -395,6 +552,16 @@ export const WorkoutCameraScreen: React.FC<WorkoutCameraScreenProps> = ({
   // Workout Controls Logic
   const handleStartWorkout = () => {
     triggerHaptic('notification');
+    if (restTimerRef.current) {
+      clearInterval(restTimerRef.current);
+      restTimerRef.current = null;
+    }
+    setIsResting(false);
+    setRestSecondsRemaining(0);
+    setCurrentSetNumber(1);
+    setTotalSetsCount(getDynamicSetsCount(selectedExercise));
+    completedSetsHistoryRef.current = [];
+
     const engine = ExerciseEngineRegistry.getEngine(selectedExercise);
     engine.reset();
     previousRepCountRef.current = 0;
@@ -417,7 +584,7 @@ export const WorkoutCameraScreen: React.FC<WorkoutCameraScreenProps> = ({
     });
 
     setWorkoutStatus('active');
-    SpeechService.speak(`Starting ${selectedExercise} workout.`);
+    SpeechService.speak(`Starting ${selectedExercise} workout. Set 1 of ${getDynamicSetsCount(selectedExercise)}.`);
   };
 
   const handlePauseWorkout = () => {
@@ -434,21 +601,46 @@ export const WorkoutCameraScreen: React.FC<WorkoutCameraScreenProps> = ({
 
   const handleFinishWorkout = (overrideReps?: number, overridePerfect?: number, overrideScore?: number) => {
     triggerHaptic('notification');
+    if (restTimerRef.current) {
+      clearInterval(restTimerRef.current);
+      restTimerRef.current = null;
+    }
+    setIsResting(false);
+    setRestSecondsRemaining(0);
+
     const now = new Date();
     const isIsometric = selectedExercise.toLowerCase().includes('plank');
     const repUnit = isIsometric ? 'seconds' : 'repetitions';
+    const targetPerSet = stats.targetReps || getDynamicTargetReps(selectedExercise);
 
-    const finalReps = overrideReps !== undefined ? overrideReps : stats.repCount;
-    const finalPerfect = overridePerfect !== undefined ? overridePerfect : stats.perfectReps;
-    const finalScore = overrideScore !== undefined ? overrideScore : stats.formAccuracyScore;
-    const target = stats.targetReps || getDynamicTargetReps(selectedExercise);
+    // Aggregate all completed sets history
+    const allSets = [...completedSetsHistoryRef.current];
+    // If the active set was not recorded yet (e.g. manual finish or single set override)
+    if (
+      overrideReps !== undefined ||
+      (stats.repCount > 0 &&
+        (allSets.length === 0 || allSets[allSets.length - 1].setNumber !== currentSetNumber))
+    ) {
+      allSets.push({
+        setNumber: currentSetNumber,
+        reps: overrideReps !== undefined ? overrideReps : stats.repCount,
+        perfectReps: overridePerfect !== undefined ? overridePerfect : stats.perfectReps,
+        formScore: overrideScore !== undefined ? overrideScore : stats.formAccuracyScore,
+      });
+    }
 
-    const repKcal = finalReps * (selectedExercise === 'Pushups' || selectedExercise === 'Pullups' ? 0.48 : 0.40);
+    const totalReps = allSets.length > 0 ? allSets.reduce((sum, s) => sum + s.reps, 0) : stats.repCount;
+    const totalPerfect = allSets.length > 0 ? allSets.reduce((sum, s) => sum + s.perfectReps, 0) : stats.perfectReps;
+    const avgScore = allSets.length > 0
+      ? Math.round(allSets.reduce((sum, s) => sum + s.formScore, 0) / allSets.length)
+      : stats.formAccuracyScore;
+
+    const repKcal = totalReps * (selectedExercise === 'Pushups' || selectedExercise === 'Pullups' ? 0.48 : 0.40);
     const activeKcal = (stats.activeSeconds / 60) * 4.2;
     const totalCalories = Math.max(stats.caloriesBurned, Math.round(repKcal + activeKcal));
 
-    const goodReps = finalPerfect;
-    const badReps = Math.max(0, finalReps - finalPerfect);
+    const goodReps = totalPerfect;
+    const badReps = Math.max(0, totalReps - totalPerfect);
 
     const initialSummary: WorkoutSummary = {
       id: Date.now().toString(),
@@ -459,12 +651,12 @@ export const WorkoutCameraScreen: React.FC<WorkoutCameraScreenProps> = ({
       durationSeconds: stats.durationSeconds,
       activeSeconds: stats.activeSeconds,
       caloriesBurned: totalCalories,
-      repCount: finalReps,
-      perfectReps: finalPerfect,
+      repCount: totalReps,
+      perfectReps: totalPerfect,
       goodReps,
       badReps,
-      targetReps: target,
-      formAccuracyScore: finalScore,
+      targetReps: targetPerSet,
+      formAccuracyScore: avgScore,
       geminiObservations: [...geminiObservationsRef.current],
       aiAnalysis: null,
       completedAt: now,
@@ -472,11 +664,11 @@ export const WorkoutCameraScreen: React.FC<WorkoutCameraScreenProps> = ({
 
     setStats((prev) => ({
       ...prev,
-      repCount: finalReps,
-      perfectReps: finalPerfect,
+      repCount: totalReps,
+      perfectReps: totalPerfect,
       goodReps,
       badReps,
-      formAccuracyScore: finalScore,
+      formAccuracyScore: avgScore,
       caloriesBurned: totalCalories,
     }));
 
@@ -484,9 +676,9 @@ export const WorkoutCameraScreen: React.FC<WorkoutCameraScreenProps> = ({
     setSummaryData(initialSummary);
     setShowSummaryModal(true);
 
-    const speechText = finalReps >= target
-      ? `Goal achieved! You completed all ${finalReps} ${repUnit}. Great job!`
-      : `Workout completed. You achieved ${finalReps} ${repUnit}.`;
+    const speechText = allSets.length >= totalSetsCount
+      ? `All ${totalSetsCount} sets completed! You achieved a total of ${totalReps} ${repUnit}. Outstanding work!`
+      : `Workout completed. You achieved ${totalReps} ${repUnit}.`;
     SpeechService.speak(speechText);
 
     // Asynchronously generate Post-Workout Gemini Coaching Summary
@@ -498,11 +690,11 @@ export const WorkoutCameraScreen: React.FC<WorkoutCameraScreenProps> = ({
       durationSeconds: stats.durationSeconds,
       activeSeconds: stats.activeSeconds,
       caloriesBurned: totalCalories,
-      repCount: finalReps,
+      repCount: totalReps,
       goodReps,
       badReps,
-      plannedReps: target,
-      formAccuracyScore: finalScore,
+      plannedReps: targetPerSet * totalSetsCount,
+      formAccuracyScore: avgScore,
       geminiObservations: [...geminiObservationsRef.current],
     })
       .then((aiAnalysis) => {
@@ -615,12 +807,23 @@ export const WorkoutCameraScreen: React.FC<WorkoutCameraScreenProps> = ({
       return;
     }
 
-    // 2. Resolve next exercise name and target reps
+    // 2. Resolve next exercise name and target reps & sets
     const nextName = nextExercise.name;
     const nextTargetReps = nextExercise.reps || getDynamicTargetReps(nextName);
+    const nextSets = nextExercise.sets || getDynamicSetsCount(nextName);
     const isPlank = nextName.toLowerCase().includes('plank');
 
     // 3. Reset form engine and tracking
+    if (restTimerRef.current) {
+      clearInterval(restTimerRef.current);
+      restTimerRef.current = null;
+    }
+    setIsResting(false);
+    setRestSecondsRemaining(0);
+    setCurrentSetNumber(1);
+    setTotalSetsCount(nextSets);
+    completedSetsHistoryRef.current = [];
+
     const newEngine = ExerciseEngineRegistry.getEngine(nextName);
     newEngine.reset();
     previousRepCountRef.current = 0;
@@ -653,7 +856,7 @@ export const WorkoutCameraScreen: React.FC<WorkoutCameraScreenProps> = ({
 
     // 6. Voice Coach Cue
     SpeechService.speak(
-      `Starting next exercise: ${nextName}. ${isPlank ? `Hold for ${nextTargetReps} seconds.` : `Target: ${nextTargetReps} reps.`} Get ready!`
+      `Starting next exercise: ${nextName}. Set 1 of ${nextSets}. ${isPlank ? `Hold for ${nextTargetReps} seconds.` : `Target: ${nextTargetReps} reps.`} Get ready!`
     );
   };
 
@@ -666,6 +869,16 @@ export const WorkoutCameraScreen: React.FC<WorkoutCameraScreenProps> = ({
 
   const resetWorkoutScreen = () => {
     setWorkoutStatus('idle');
+    if (restTimerRef.current) {
+      clearInterval(restTimerRef.current);
+      restTimerRef.current = null;
+    }
+    setIsResting(false);
+    setRestSecondsRemaining(0);
+    setCurrentSetNumber(1);
+    setTotalSetsCount(getDynamicSetsCount(selectedExercise));
+    completedSetsHistoryRef.current = [];
+
     const engine = ExerciseEngineRegistry.getEngine(selectedExercise);
     engine.reset();
     previousRepCountRef.current = 0;
@@ -725,7 +938,7 @@ export const WorkoutCameraScreen: React.FC<WorkoutCameraScreenProps> = ({
         />
       )}
 
-      {/* Head-Up Display (HUD) with Real-Time AI Form Corrections & Hero Rep Widget */}
+      {/* Head-Up Display (HUD) with Real-Time AI Form Corrections, Multi-Set Progress & Rest Timer */}
       <WorkoutHUDOverlay
         status={workoutStatus}
         stats={stats}
@@ -734,6 +947,11 @@ export const WorkoutCameraScreen: React.FC<WorkoutCameraScreenProps> = ({
         selectedExercise={selectedExercise}
         showPoseSkeleton={showPoseSkeleton}
         targetReps={stats.targetReps || getDynamicTargetReps(selectedExercise)}
+        currentSet={currentSetNumber}
+        totalSets={totalSetsCount}
+        isResting={isResting}
+        restSecondsRemaining={restSecondsRemaining}
+        onSkipRest={handleStartNextSet}
         phase={currentPhase}
         kneeAngle={liveKneeAngle}
         elbowAngle={liveElbowAngle}

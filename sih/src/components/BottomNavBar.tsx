@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { Theme } from '../config/theme';
 
 export type MainTabType = 'home' | 'workout' | 'progress' | 'profile';
 
@@ -14,15 +15,18 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({ activeTab, onTabSele
   const handlePress = (tab: MainTabType) => {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    } catch {
-      // Fallback
-    }
+    } catch {}
     onTabSelect(tab);
   };
 
-  const tabs: Array<{ id: MainTabType; label: string; icon: keyof typeof Ionicons.glyphMap; activeIcon: keyof typeof Ionicons.glyphMap }> = [
+  const tabs: Array<{
+    id: MainTabType;
+    label: string;
+    icon: keyof typeof Ionicons.glyphMap;
+    activeIcon: keyof typeof Ionicons.glyphMap;
+  }> = [
     { id: 'home', label: 'Home', icon: 'home-outline', activeIcon: 'home' },
-    { id: 'workout', label: 'Workout', icon: 'heart-outline', activeIcon: 'heart' },
+    { id: 'workout', label: 'Workout', icon: 'barbell-outline', activeIcon: 'barbell' },
     { id: 'progress', label: 'Progress', icon: 'bar-chart-outline', activeIcon: 'bar-chart' },
     { id: 'profile', label: 'Profile', icon: 'person-outline', activeIcon: 'person' },
   ];
@@ -41,7 +45,7 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({ activeTab, onTabSele
             <Ionicons
               name={isActive ? tab.activeIcon : tab.icon}
               size={22}
-              color={isActive ? '#10B981' : '#64748B'}
+              color={isActive ? Theme.colors.primaryGreen : Theme.colors.textSecondary}
             />
             <Text style={[styles.tabLabel, isActive && styles.tabLabelActive]}>
               {tab.label}
@@ -56,11 +60,11 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({ activeTab, onTabSele
 const styles = StyleSheet.create({
   navContainer: {
     flexDirection: 'row',
-    backgroundColor: '#0D1527',
+    backgroundColor: Theme.colors.surface,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.06)',
+    borderTopColor: Theme.colors.borderSubtle,
     paddingVertical: 10,
-    paddingHorizontal: 12,
+    paddingHorizontal: Theme.spacing.md,
     justifyContent: 'space-around',
     alignItems: 'center',
     height: 64,
@@ -73,11 +77,11 @@ const styles = StyleSheet.create({
   },
   tabLabel: {
     fontSize: 11,
-    fontWeight: '600',
-    color: '#64748B',
+    fontWeight: '500',
+    color: Theme.colors.textSecondary,
   },
   tabLabelActive: {
-    color: '#10B981',
+    color: Theme.colors.primaryGreen,
     fontWeight: '700',
   },
 });

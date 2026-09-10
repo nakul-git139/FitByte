@@ -5,10 +5,12 @@ import {
   View,
   TouchableOpacity,
   ScrollView,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { Theme } from '../config/theme';
 
 interface ChooseWorkoutScreenProps {
   initialExercise?: string;
@@ -29,75 +31,53 @@ export const ChooseWorkoutScreen: React.FC<ChooseWorkoutScreenProps> = ({
     {
       id: 'Pushups',
       name: 'Pushups',
-      category: 'UPPER BODY STRENGTH',
+      category: 'Upper body',
       difficulty: 'Intermediate',
-      description: 'Build upper-body strength while FitByte analyzes your posture and form.',
-      icon: 'barbell' as const,
-      color: '#10B981',
+      imageUrl: 'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?auto=format&fit=crop&w=400&q=80',
     },
     {
       id: 'Squats',
       name: 'Squats',
-      category: 'LOWER BODY STRENGTH',
+      category: 'Lower body',
       difficulty: 'Beginner',
-      description: 'Strengthen your lower body with real-time AI-powered form feedback.',
-      icon: 'body' as const,
-      color: '#38BDF8',
-    },
-    {
-      id: 'Pullups',
-      name: 'Pullups',
-      category: 'BACK & BICEPS STRENGTH',
-      difficulty: 'Advanced',
-      description: 'Master pull-up mechanics with chin-over-bar and lockout tracking.',
-      icon: 'trending-up' as const,
-      color: '#8B5CF6',
+      imageUrl: 'https://images.unsplash.com/photo-1574680096145-d05b474e2155?auto=format&fit=crop&w=400&q=80',
     },
     {
       id: 'Plank',
       name: 'Plank',
-      category: 'CORE & SPINE STABILITY',
+      category: 'Core & Spine',
       difficulty: 'Beginner',
-      description: 'Hold a solid straight-line posture while AI monitors hip sagging.',
-      icon: 'timer' as const,
-      color: '#F59E0B',
+      imageUrl: 'https://images.unsplash.com/photo-1549060279-7e168fcee0c2?auto=format&fit=crop&w=400&q=80',
     },
     {
       id: 'Lunges',
       name: 'Lunges',
-      category: 'UNILATERAL LEG POWER',
+      category: 'Lower body',
       difficulty: 'Intermediate',
-      description: 'Target quads and glutes with depth alignment and torso stability.',
-      icon: 'footsteps' as const,
-      color: '#EC4899',
+      imageUrl: 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?auto=format&fit=crop&w=400&q=80',
     },
     {
       id: 'Bicep Curls',
       name: 'Bicep Curls',
-      category: 'ARM HYPERTROPHY',
+      category: 'Arms & Power',
       difficulty: 'Beginner',
-      description: 'Isolate arm flexors with full range of motion elbow tracking.',
-      icon: 'fitness' as const,
-      color: '#06B6D4',
+      imageUrl: 'https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?auto=format&fit=crop&w=400&q=80',
+    },
+    {
+      id: 'Pullups',
+      name: 'Pullups',
+      category: 'Back & Arms',
+      difficulty: 'Advanced',
+      imageUrl: 'https://images.unsplash.com/photo-1598971639058-fab3c3109a00?auto=format&fit=crop&w=400&q=80',
     },
   ];
 
   const handleSelectCard = (id: string) => {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    } catch {
-      // Fallback
-    }
+    } catch {}
     setSelectedExercise(id);
-  };
-
-  const handleContinue = () => {
-    try {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch {
-      // Fallback
-    }
-    onSelectExerciseAndContinue(selectedExercise);
+    onSelectExerciseAndContinue(id);
   };
 
   return (
@@ -106,18 +86,17 @@ export const ChooseWorkoutScreen: React.FC<ChooseWorkoutScreenProps> = ({
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Top Header & Optional Back Arrow */}
-        {onBack && (
-          <TouchableOpacity style={styles.backButton} onPress={onBack} activeOpacity={0.7}>
-            <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
-          </TouchableOpacity>
-        )}
-
-        <View style={styles.headerSection}>
-          <Text style={styles.mainTitle}>Choose Your Workout</Text>
-          <Text style={styles.subtitle}>
-            Select an exercise and let FitByte analyze your form in real time.
-          </Text>
+        {/* Top Header */}
+        <View style={styles.headerRow}>
+          {onBack && (
+            <TouchableOpacity style={styles.backButton} onPress={onBack} activeOpacity={0.7}>
+              <Ionicons name="arrow-back" size={20} color={Theme.colors.textPrimary} />
+            </TouchableOpacity>
+          )}
+          <View style={styles.headerTitles}>
+            <Text style={styles.mainTitle}>Choose an exercise</Text>
+            <Text style={styles.subtitle}>What would you like to work on?</Text>
+          </View>
         </View>
 
         {/* Exercise Cards List */}
@@ -134,59 +113,36 @@ export const ChooseWorkoutScreen: React.FC<ChooseWorkoutScreenProps> = ({
                 onPress={() => handleSelectCard(item.id)}
                 activeOpacity={0.8}
               >
-                {/* Header Row of Card */}
-                <View style={styles.cardHeaderRow}>
-                  <View style={[styles.exerciseIconBox, { backgroundColor: isSelected ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255, 255, 255, 0.05)' }]}>
-                    <Ionicons name={item.icon} size={22} color={isSelected ? '#10B981' : item.color} />
-                  </View>
-
-                  <View style={styles.cardHeaderTextCol}>
-                    <Text style={[styles.exerciseName, isSelected && styles.exerciseNameSelected]}>
-                      {item.name}
-                    </Text>
-                    <Text style={styles.exerciseCategory}>{item.category}</Text>
-                  </View>
-
-                  {isSelected && (
-                    <View style={styles.checkBadge}>
-                      <Ionicons name="checkmark-circle" size={22} color="#10B981" />
-                    </View>
-                  )}
+                <View style={styles.cardLeftContent}>
+                  <Text style={styles.cardTitle}>{item.name}</Text>
+                  <Text style={styles.cardCategory}>
+                    {item.category} · {item.difficulty}
+                  </Text>
                 </View>
 
-                {/* Difficulty Tag */}
-                <View style={styles.difficultyPill}>
-                  <Text style={styles.difficultyText}>{item.difficulty}</Text>
-                </View>
+                <Image
+                  source={{ uri: item.imageUrl }}
+                  style={styles.cardImage}
+                  resizeMode="cover"
+                />
 
-                {/* Description Text */}
-                <Text style={styles.cardDescription}>{item.description}</Text>
+                <View style={styles.arrowCircle}>
+                  <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
+                </View>
               </TouchableOpacity>
             );
           })}
         </View>
 
-        {/* Bottom CTA Button */}
-        <TouchableOpacity
-          style={styles.continueButton}
-          onPress={handleContinue}
-          activeOpacity={0.85}
-        >
-          <Ionicons name="arrow-forward" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
-          <Text style={styles.continueButtonText}>CONTINUE</Text>
-        </TouchableOpacity>
+        {/* "More coming soon" footer card */}
+        <View style={styles.comingSoonCard}>
+          <Ionicons name="barbell-outline" size={24} color={Theme.colors.primaryGreen} />
+          <Text style={styles.comingSoonTitle}>More exercises coming soon</Text>
+          <Text style={styles.comingSoonSubtitle}>
+            We're working on adding new guided movements and routines for you.
+          </Text>
+        </View>
       </ScrollView>
-
-      {/* Floating Settings/Action Button */}
-      {onOpenSettings && (
-        <TouchableOpacity
-          style={styles.floatingSettingsButton}
-          onPress={onOpenSettings}
-          activeOpacity={0.85}
-        >
-          <Ionicons name="settings" size={22} color="#FFFFFF" />
-        </TouchableOpacity>
-      )}
     </SafeAreaView>
   );
 };
@@ -194,141 +150,109 @@ export const ChooseWorkoutScreen: React.FC<ChooseWorkoutScreenProps> = ({
 const styles = StyleSheet.create({
   safeContainer: {
     flex: 1,
-    backgroundColor: '#0B132B',
+    backgroundColor: Theme.colors.background,
   },
   scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 40,
+    paddingHorizontal: Theme.spacing.lg,
+    paddingTop: Theme.spacing.sm,
+    paddingBottom: Theme.spacing.xxxl,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Theme.spacing.xl,
   },
   backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#162238',
-    justifyContent: 'center',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Theme.colors.surface,
     alignItems: 'center',
-    marginBottom: 14,
+    justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: Theme.colors.borderSubtle,
+    marginRight: Theme.spacing.md,
   },
-  headerSection: {
-    marginBottom: 24,
-  },
-  mainTitle: {
-    color: '#F8FAFC',
-    fontSize: 28,
-    fontWeight: '800',
-    letterSpacing: -0.5,
-    marginBottom: 6,
-  },
-  subtitle: {
-    color: '#94A3B8',
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  cardsContainer: {
-    gap: 14,
-    marginBottom: 24,
-  },
-  exerciseCard: {
-    backgroundColor: '#162238',
-    borderRadius: 20,
-    padding: 18,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  exerciseCardSelected: {
-    borderColor: '#10B981',
-    backgroundColor: 'rgba(16, 185, 129, 0.06)',
-  },
-  cardHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  exerciseIconBox: {
-    width: 46,
-    height: 46,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 14,
-  },
-  cardHeaderTextCol: {
+  headerTitles: {
     flex: 1,
   },
-  exerciseName: {
-    color: '#F8FAFC',
-    fontSize: 18,
+  mainTitle: {
+    fontSize: Theme.typography.sizes.xl,
     fontWeight: '800',
-    marginBottom: 2,
+    color: Theme.colors.textPrimary,
+    letterSpacing: -0.4,
   },
-  exerciseNameSelected: {
-    color: '#10B981',
+  subtitle: {
+    fontSize: Theme.typography.sizes.sm,
+    color: Theme.colors.textSecondary,
+    marginTop: 2,
   },
-  exerciseCategory: {
-    color: '#94A3B8',
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.8,
+  cardsContainer: {
+    gap: Theme.spacing.md,
+    marginBottom: Theme.spacing.xl,
   },
-  checkBadge: {
-    marginLeft: 8,
-  },
-  difficultyPill: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#1E293B',
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 10,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
-  },
-  difficultyText: {
-    color: '#CBD5E1',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  cardDescription: {
-    color: '#94A3B8',
-    fontSize: 13,
-    lineHeight: 19,
-  },
-  continueButton: {
+  exerciseCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#10B981',
-    borderRadius: 24,
-    paddingVertical: 16,
-    shadowColor: '#10B981',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    elevation: 4,
+    backgroundColor: Theme.colors.surface,
+    padding: Theme.spacing.base,
+    borderRadius: Theme.borderRadius.xl,
+    borderWidth: 1,
+    borderColor: Theme.colors.borderSubtle,
+    ...Theme.shadows.soft,
   },
-  continueButtonText: {
-    color: '#FFFFFF',
-    fontSize: 15,
+  exerciseCardSelected: {
+    borderColor: Theme.colors.primaryGreen,
+    backgroundColor: '#FAFDFB',
+  },
+  cardLeftContent: {
+    flex: 1,
+    marginRight: 10,
+  },
+  cardTitle: {
+    fontSize: Theme.typography.sizes.md,
     fontWeight: '800',
-    letterSpacing: 0.8,
+    color: Theme.colors.textPrimary,
   },
-  floatingSettingsButton: {
-    position: 'absolute',
-    bottom: 20,
-    right: 20,
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#2563EB',
-    justifyContent: 'center',
+  cardCategory: {
+    fontSize: Theme.typography.sizes.xs,
+    color: Theme.colors.textSecondary,
+    marginTop: 4,
+    fontWeight: '500',
+  },
+  cardImage: {
+    width: 60,
+    height: 60,
+    borderRadius: Theme.borderRadius.md,
+    backgroundColor: Theme.colors.surfaceSecondary,
+    marginRight: 12,
+  },
+  arrowCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: Theme.colors.primaryGreen,
     alignItems: 'center',
-    shadowColor: '#2563EB',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 8,
+    justifyContent: 'center',
+  },
+  comingSoonCard: {
+    backgroundColor: Theme.colors.lightGreen,
+    padding: Theme.spacing.lg,
+    borderRadius: Theme.borderRadius.xl,
+    alignItems: 'center',
+    textAlign: 'center',
+  },
+  comingSoonTitle: {
+    fontSize: Theme.typography.sizes.base,
+    fontWeight: '700',
+    color: Theme.colors.primaryGreenDark,
+    marginTop: 8,
+  },
+  comingSoonSubtitle: {
+    fontSize: Theme.typography.sizes.xs,
+    color: Theme.colors.textSecondary,
+    textAlign: 'center',
+    marginTop: 4,
+    lineHeight: 18,
   },
 });

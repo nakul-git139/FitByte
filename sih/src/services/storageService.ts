@@ -2,7 +2,8 @@ import { WorkoutSessionRecord } from '../types/workout';
 import { User } from '../types/auth';
 
 const STORAGE_KEY = 'FITPILOT_WORKOUT_HISTORY_V1';
-const AUTH_STORAGE_KEY = 'FITBYTE_AUTH_SESSION_V1';
+const AUTH_STORAGE_KEY = 'FITPILOT_AUTH_SESSION_V1';
+const LEGACY_AUTH_STORAGE_KEY = 'FITBYTE_AUTH_SESSION_V1';
 
 // In-memory cache fallback
 let memoryHistory: WorkoutSessionRecord[] = [];
@@ -204,7 +205,10 @@ export class StorageService {
   public static async getAuthSession(): Promise<{ token: string; user: User } | null> {
     try {
       if (typeof globalThis !== 'undefined' && (globalThis as any).localStorage) {
-        const raw = (globalThis as any).localStorage.getItem(AUTH_STORAGE_KEY);
+        let raw = (globalThis as any).localStorage.getItem(AUTH_STORAGE_KEY);
+        if (!raw) {
+          raw = (globalThis as any).localStorage.getItem(LEGACY_AUTH_STORAGE_KEY);
+        }
         if (raw) {
           const parsed = JSON.parse(raw);
           if (parsed && parsed.token && parsed.user) {
@@ -227,6 +231,7 @@ export class StorageService {
     try {
       if (typeof globalThis !== 'undefined' && (globalThis as any).localStorage) {
         (globalThis as any).localStorage.removeItem(AUTH_STORAGE_KEY);
+        (globalThis as any).localStorage.removeItem(LEGACY_AUTH_STORAGE_KEY);
       }
     } catch (e) {
       console.warn('[StorageService] Error clearing auth session:', e);
