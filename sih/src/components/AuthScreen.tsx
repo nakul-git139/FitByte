@@ -10,6 +10,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -35,6 +36,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState<boolean>(false);
+  const [showGoogleModal, setShowGoogleModal] = useState<boolean>(false);
+  const [googleEmailInput, setGoogleEmailInput] = useState<string>('');
+  const [googleNameInput, setGoogleNameInput] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleTabSwitch = (newMode: AuthMode) => {
@@ -91,26 +95,32 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
     }
   };
 
-  const handleGoogleSignIn = async () => {
-    setErrorMessage(null);
+  const executeGoogleAuth = async (targetEmail: string, targetName?: string) => {
+    const cleanEmail = targetEmail.trim().toLowerCase();
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      setErrorMessage('Please enter a valid Gmail address');
+      return;
+    }
+
+    const cleanName = (targetName && targetName.trim().length > 0)
+      ? targetName.trim()
+      : cleanEmail.split('@')[0];
+
+    setShowGoogleModal(false);
     setIsGoogleLoading(true);
+    setErrorMessage(null);
+
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } catch {}
 
     try {
-      // In mobile app / simulator, prompt or use direct Google account identification
-      // Default to user's Google account or provide quick Google profile sign-in
-      const promptEmail = email.trim().length > 0 && email.includes('@')
-        ? email.trim()
-        : 'athlete.google@fitbyte.ai';
-
       const res = await AuthService.loginWithGoogle({
-        idToken: `mock_google_${promptEmail}`,
+        idToken: `mock_google_${cleanEmail}`,
         userInfo: {
-          id: `google_${Date.now()}`,
-          email: promptEmail,
-          name: name.trim() || promptEmail.split('@')[0],
+          id: `google_${cleanEmail.replace(/[^a-zA-Z0-9]/g, '_')}`,
+          email: cleanEmail,
+          name: cleanName,
           picture: 'https://lh3.googleusercontent.com/a/default-user',
         },
       });
@@ -127,6 +137,18 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
     } catch (err: any) {
       setIsGoogleLoading(false);
       setErrorMessage(err.message || 'Google Sign-In error');
+    }
+  };
+
+  const handleGoogleSignIn = () => {
+    // If user already typed an email into the input field, sign in with it immediately
+    if (email.trim().length > 0 && email.includes('@')) {
+      executeGoogleAuth(email, name);
+    } else {
+      // Prompt modal to enter/pick their exact Gmail address
+      setGoogleEmailInput(email.trim());
+      setGoogleNameInput(name.trim());
+      setShowGoogleModal(true);
     }
   };
 
@@ -309,6 +331,82 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Google Account Picker / Sign-In Modal */}
+      <Modal
+        visible={showGoogleModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowGoogleModal(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
+          <View style={styles.modalCard}>
+            <View style={styles.modalGoogleHeader}>
+              <View style={styles.googleIconCircleLarge}>
+                <Ionicons name="logo-google" size={26} color="#EA4335" />
+              </View>
+              <Text style={styles.modalTitle}>Sign in with Google</Text>
+              <Text style={styles.modalSubtitle}>
+                Enter your Google account to connect with FitByte
+              </Text>
+            </View>
+
+            <View style={styles.modalInputGroup}>
+              <Text style={styles.modalInputLabel}>YOUR GMAIL ADDRESS</Text>
+              <View style={styles.inputContainer}>
+                <Ionicons name="mail-outline" size={18} color="#EA4335" style={styles.inputIcon} />
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="e.g. yourname@gmail.com"
+                  placeholderTextColor="#64748B"
+                  value={googleEmailInput}
+                  onChangeText={setGoogleEmailInput}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoFocus={true}
+                />
+              </View>
+            </View>
+
+            <View style={styles.modalInputGroup}>
+              <Text style={styles.modalInputLabel}>DISPLAY NAME (OPTIONAL)</Text>
+              <View style={styles.inputContainer}>
+                <Ionicons name="person-outline" size={18} color="#64748B" style={styles.inputIcon} />
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="e.g. Alex Hunter"
+                  placeholderTextColor="#64748B"
+                  value={googleNameInput}
+                  onChangeText={setGoogleNameInput}
+                  autoCapitalize="words"
+                  autoCorrect={false}
+                />
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={styles.modalSubmitButton}
+              onPress={() => executeGoogleAuth(googleEmailInput, googleNameInput)}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.modalSubmitButtonText}>Sign In with Google</Text>
+              <Ionicons name="arrow-forward" size={16} color="#0A0F1D" />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.modalCancelButton}
+              onPress={() => setShowGoogleModal(false)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.modalCancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -513,4 +611,91 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 380,
+    backgroundColor: '#162238',
+    borderRadius: 24,
+    padding: 24,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.5,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  modalGoogleHeader: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  googleIconCircleLarge: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+    shadowColor: '#EA4335',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  modalTitle: {
+    color: '#F8FAFC',
+    fontSize: 20,
+    fontWeight: '800',
+    marginBottom: 4,
+  },
+  modalSubtitle: {
+    color: '#94A3B8',
+    fontSize: 12,
+    textAlign: 'center',
+  },
+  modalInputGroup: {
+    marginBottom: 14,
+  },
+  modalInputLabel: {
+    color: '#94A3B8',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    marginBottom: 6,
+  },
+  modalSubmitButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#10B981',
+    borderRadius: 14,
+    height: 48,
+    marginTop: 8,
+    gap: 8,
+  },
+  modalSubmitButtonText: {
+    color: '#0A0F1D',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  modalCancelButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    marginTop: 6,
+  },
+  modalCancelButtonText: {
+    color: '#94A3B8',
+    fontSize: 13,
+    fontWeight: '600',
+  },
 });
+

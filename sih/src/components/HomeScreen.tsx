@@ -10,8 +10,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { StorageService, DashboardStats } from '../services/storageService';
+import { User } from '../types/auth';
 
 interface HomeScreenProps {
+  user?: User | null;
   onStartMainWorkout: () => void;
   onSelectQuickExercise: (exerciseName: string) => void;
   onNavigateToWorkouts: () => void;
@@ -19,6 +21,7 @@ interface HomeScreenProps {
 }
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
+  user,
   onStartMainWorkout,
   onSelectQuickExercise,
   onNavigateToWorkouts,
@@ -99,14 +102,20 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         <View style={styles.topHeaderRow}>
           <View>
             <Text style={styles.greetingSub}>Good morning,</Text>
-            <Text style={styles.greetingTitle}>Athlete</Text>
+            <Text style={styles.greetingTitle}>
+              {user?.name ? user.name.split(' ')[0] : 'Athlete'}
+            </Text>
           </View>
           <TouchableOpacity
             style={styles.avatarButton}
             onPress={onNavigateToProfile}
             activeOpacity={0.7}
           >
-            <Ionicons name="person" size={20} color="#FFFFFF" />
+            <Ionicons
+              name={user?.authProvider === 'google' ? 'logo-google' : 'person'}
+              size={user?.authProvider === 'google' ? 18 : 20}
+              color="#FFFFFF"
+            />
           </TouchableOpacity>
         </View>
 

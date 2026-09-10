@@ -148,6 +148,7 @@ export default function App() {
           <View style={styles.tabContentContainer}>
             {activeTab === 'home' && (
               <HomeScreen
+                user={currentUser}
                 onStartMainWorkout={() => handleStartDailyFlow()}
                 onSelectQuickExercise={handleQuickLaunchExercise}
                 onNavigateToWorkouts={() => setActiveTab('workout')}
