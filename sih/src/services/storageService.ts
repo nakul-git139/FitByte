@@ -1,9 +1,12 @@
 import { WorkoutSessionRecord } from '../types/workout';
+import { User } from '../types/auth';
 
 const STORAGE_KEY = 'FITPILOT_WORKOUT_HISTORY_V1';
+const AUTH_STORAGE_KEY = 'FITBYTE_AUTH_SESSION_V1';
 
 // In-memory cache fallback
 let memoryHistory: WorkoutSessionRecord[] = [];
+let memoryAuthSession: { token: string; user: User } | null = null;
 
 export interface DashboardStats {
   totalWorkouts: number;
@@ -177,6 +180,56 @@ export class StorageService {
       }
     } catch (e) {
       console.warn('[StorageService] Error clearing storage:', e);
+    }
+  }
+
+  /**
+   * Saves authenticated user session and JWT token
+   */
+  public static async saveAuthSession(token: string, user: User): Promise<void> {
+    const session = { token, user };
+    memoryAuthSession = session;
+    try {
+      if (typeof globalThis !== 'undefined' && (globalThis as any).localStorage) {
+        (globalThis as any).localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(session));
+      }
+    } catch (e) {
+      console.warn('[StorageService] Error saving auth session:', e);
+    }
+  }
+
+  /**
+   * Retrieves stored authenticated user session and JWT token
+   */
+  public static async getAuthSession(): Promise<{ token: string; user: User } | null> {
+    try {
+      if (typeof globalThis !== 'undefined' && (globalThis as any).localStorage) {
+        const raw = (globalThis as any).localStorage.getItem(AUTH_STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && parsed.token && parsed.user) {
+            memoryAuthSession = parsed;
+            return parsed;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[StorageService] Error reading auth session:', e);
+    }
+    return memoryAuthSession;
+  }
+
+  /**
+   * Clears the stored auth session (logout)
+   */
+  public static async clearAuthSession(): Promise<void> {
+    memoryAuthSession = null;
+    try {
+      if (typeof globalThis !== 'undefined' && (globalThis as any).localStorage) {
+        (globalThis as any).localStorage.removeItem(AUTH_STORAGE_KEY);
+      }
+    } catch (e) {
+      console.warn('[StorageService] Error clearing auth session:', e);
     }
   }
 }

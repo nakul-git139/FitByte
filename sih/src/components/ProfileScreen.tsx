@@ -13,12 +13,21 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { SpeechService } from '../engine/core/SpeechService';
 import { StorageService, DashboardStats } from '../services/storageService';
+import { User } from '../types/auth';
 
 interface ProfileScreenProps {
+  user?: User | null;
   onClearHistoryComplete?: () => void;
+  onSignOut?: () => void;
+  onOpenAuth?: () => void;
 }
 
-export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onClearHistoryComplete }) => {
+export const ProfileScreen: React.FC<ProfileScreenProps> = ({
+  user,
+  onClearHistoryComplete,
+  onSignOut,
+  onOpenAuth,
+}) => {
   const [voiceFeedback, setVoiceFeedback] = useState<boolean>(true);
   const [hapticFeedback, setHapticFeedback] = useState<boolean>(true);
   const [stats, setStats] = useState<DashboardStats>({
@@ -78,6 +87,23 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onClearHistoryComp
     );
   };
 
+  const handleSignOut = () => {
+    Alert.alert(
+      'Sign Out',
+      'Are you sure you want to sign out of your FitByte account?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Sign Out',
+          style: 'destructive',
+          onPress: () => {
+            if (onSignOut) onSignOut();
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <SafeAreaView style={styles.safeContainer} edges={['top', 'left', 'right']}>
       <ScrollView
@@ -87,10 +113,30 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onClearHistoryComp
         {/* Top Avatar & Profile Header */}
         <View style={styles.avatarSection}>
           <View style={styles.avatarCircle}>
-            <Ionicons name="person" size={48} color="#10B981" />
+            <Ionicons
+              name={user?.authProvider === 'google' ? 'logo-google' : 'person'}
+              size={user?.authProvider === 'google' ? 40 : 48}
+              color="#10B981"
+            />
           </View>
-          <Text style={styles.profileName}>FITBYTE ATHLETE</Text>
-          <Text style={styles.profileSubtitle}>AI-Powered Fitness Journey</Text>
+          <Text style={styles.profileName}>
+            {user ? user.name.toUpperCase() : 'FITBYTE ATHLETE'}
+          </Text>
+          <Text style={styles.profileSubtitle}>
+            {user ? user.email : 'Guest Athlete • AI-Powered Journey'}
+          </Text>
+          {user && (
+            <View style={styles.providerBadge}>
+              <Ionicons
+                name={user.authProvider === 'google' ? 'logo-google' : 'shield-checkmark'}
+                size={12}
+                color={user.authProvider === 'google' ? '#EA4335' : '#10B981'}
+              />
+              <Text style={styles.providerBadgeText}>
+                {user.authProvider === 'google' ? 'Google Account' : 'FitByte Verified'}
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Quick Stats Overview Card */}
@@ -186,6 +232,62 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onClearHistoryComp
           </View>
         </View>
 
+        {/* 4. ACCOUNT & SESSION Section */}
+        <View style={styles.sectionContainer}>
+          <Text style={styles.sectionHeader}>ACCOUNT</Text>
+          <View style={styles.settingsCard}>
+            {user ? (
+              <>
+                <View style={styles.settingItemRow}>
+                  <View style={[styles.settingIconBox, { backgroundColor: 'rgba(56, 189, 248, 0.15)' }]}>
+                    <Ionicons name="mail" size={18} color="#38BDF8" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.settingItemText}>{user.email}</Text>
+                    <Text style={styles.settingSubtext}>
+                      {user.authProvider === 'google' ? 'Connected via Google' : 'FitByte Password Account'}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.cardDivider} />
+
+                <TouchableOpacity
+                  style={styles.settingItemRow}
+                  onPress={handleSignOut}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.settingIconBox, { backgroundColor: 'rgba(239, 68, 68, 0.15)' }]}>
+                    <Ionicons name="log-out-outline" size={18} color="#EF4444" />
+                  </View>
+                  <Text style={[styles.settingItemText, { color: '#EF4444', fontWeight: '700' }]}>
+                    Sign Out
+                  </Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <TouchableOpacity
+                style={styles.settingItemRow}
+                onPress={onOpenAuth}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.settingIconBox, { backgroundColor: 'rgba(16, 185, 129, 0.15)' }]}>
+                  <Ionicons name="log-in-outline" size={18} color="#10B981" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.settingItemText, { color: '#10B981', fontWeight: '700' }]}>
+                    Sign In or Create Account
+                  </Text>
+                  <Text style={styles.settingSubtext}>
+                    Save progress and sync with AI coach
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color="#64748B" />
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+
         {/* Bottom FitByte Brand Watermark */}
         <Text style={styles.brandWatermark}>FitByte</Text>
       </ScrollView>
@@ -238,6 +340,29 @@ const styles = StyleSheet.create({
   profileSubtitle: {
     color: '#94A3B8',
     fontSize: 13,
+    marginBottom: 8,
+  },
+  providerBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+    gap: 5,
+  },
+  providerBadgeText: {
+    color: '#10B981',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  settingSubtext: {
+    color: '#64748B',
+    fontSize: 11,
+    marginTop: 2,
   },
   statsSummaryCard: {
     flexDirection: 'row',

@@ -11,3 +11,5 @@ yarn-error.*
 .env.local
 .env.*
 !.env.example
+src/server/data/users.json
+

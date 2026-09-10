@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { AuthScreen } from './src/components/AuthScreen';
 import { HomeScreen } from './src/components/HomeScreen';
 import { ChooseWorkoutScreen } from './src/components/ChooseWorkoutScreen';
 import { ProgressScreen } from './src/components/ProgressScreen';
@@ -12,17 +13,48 @@ import { DailyMoodCheckInScreen } from './src/components/DailyMoodCheckInScreen'
 import { TodaysWorkoutScreen } from './src/components/TodaysWorkoutScreen';
 import { WorkoutCameraScreen } from './src/components/WorkoutCameraScreen';
 
+import { AuthService } from './src/services/authService';
+import { User } from './src/types/auth';
 import { MoodCheckInData } from './src/types/mood';
 import { GeneratedWorkout } from './src/types/aiWorkout';
 
-type AppView = 'tabs' | 'mood-checkin' | 'todays-workout' | 'workout-camera';
+type AppView = 'auth' | 'tabs' | 'mood-checkin' | 'todays-workout' | 'workout-camera';
 
 export default function App() {
   const [currentView, setCurrentView] = useState<AppView>('tabs');
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [activeTab, setActiveTab] = useState<MainTabType>('home');
   const [checkInData, setCheckInData] = useState<MoodCheckInData | null>(null);
   const [generatedWorkout, setGeneratedWorkout] = useState<GeneratedWorkout | null>(null);
   const [selectedExercise, setSelectedExercise] = useState<string>('Pushups');
+
+  // Check stored auth session on startup
+  useEffect(() => {
+    AuthService.getCurrentUser()
+      .then((user) => {
+        if (user) {
+          setCurrentUser(user);
+        }
+      })
+      .catch((err) => console.warn('[App] Error restoring auth session:', err));
+  }, []);
+
+  const handleAuthSuccess = (user: User) => {
+    setCurrentUser(user);
+    setCurrentView('tabs');
+    setActiveTab('home');
+  };
+
+  const handleContinueAsGuest = () => {
+    setCurrentView('tabs');
+    setActiveTab('home');
+  };
+
+  const handleSignOut = async () => {
+    await AuthService.logout();
+    setCurrentUser(null);
+    setCurrentView('auth');
+  };
 
   // Triggered from Home "Start Workout" button or Choose Workout "Continue"
   const handleStartDailyFlow = (exerciseName?: string) => {
@@ -84,6 +116,13 @@ export default function App() {
       <View style={styles.container}>
         <StatusBar style="light" />
 
+        {currentView === 'auth' && (
+          <AuthScreen
+            onAuthSuccess={handleAuthSuccess}
+            onContinueAsGuest={handleContinueAsGuest}
+          />
+        )}
+
         {currentView === 'tabs' && (
           <View style={styles.tabContentContainer}>
             {activeTab === 'home' && (
@@ -112,7 +151,11 @@ export default function App() {
             )}
 
             {activeTab === 'profile' && (
-              <ProfileScreen />
+              <ProfileScreen
+                user={currentUser}
+                onSignOut={handleSignOut}
+                onOpenAuth={() => setCurrentView('auth')}
+              />
             )}
 
             <BottomNavBar
