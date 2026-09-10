@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, ActivityIndicator } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
@@ -21,7 +21,8 @@ import { GeneratedWorkout } from './src/types/aiWorkout';
 type AppView = 'auth' | 'tabs' | 'mood-checkin' | 'todays-workout' | 'workout-camera';
 
 export default function App() {
-  const [currentView, setCurrentView] = useState<AppView>('tabs');
+  const [currentView, setCurrentView] = useState<AppView>('auth');
+  const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [activeTab, setActiveTab] = useState<MainTabType>('home');
   const [checkInData, setCheckInData] = useState<MoodCheckInData | null>(null);
@@ -34,9 +35,18 @@ export default function App() {
       .then((user) => {
         if (user) {
           setCurrentUser(user);
+          setCurrentView('tabs');
+        } else {
+          setCurrentView('auth');
         }
       })
-      .catch((err) => console.warn('[App] Error restoring auth session:', err));
+      .catch((err) => {
+        console.warn('[App] Error restoring auth session:', err);
+        setCurrentView('auth');
+      })
+      .finally(() => {
+        setIsAuthLoading(false);
+      });
   }, []);
 
   const handleAuthSuccess = (user: User) => {
@@ -110,6 +120,17 @@ export default function App() {
     setActiveTab('progress');
     setCurrentView('tabs');
   };
+
+  if (isAuthLoading) {
+    return (
+      <SafeAreaProvider>
+        <View style={[styles.container, styles.loadingContainer]}>
+          <StatusBar style="light" />
+          <ActivityIndicator size="large" color="#10B981" />
+        </View>
+      </SafeAreaProvider>
+    );
+  }
 
   return (
     <SafeAreaProvider>
@@ -202,6 +223,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#0A0F1D',
+  },
+  loadingContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   tabContentContainer: {
     flex: 1,
