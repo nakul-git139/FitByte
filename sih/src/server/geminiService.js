@@ -40,8 +40,14 @@ loadEnv();
  * Handles Daily Workout Generation & Keyframe Vision Coaching
  */
 
-const GEMINI_MODEL = 'gemini-3.6-flash';
-const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+const GEMINI_MODELS = [
+  'gemini-3.5-flash',
+  'gemini-3.5-flash-lite',
+  'gemini-3.7-flash',
+  'gemini-3.8-flash',
+  'gemini-flash-lite-latest',
+  'gemini-flash-latest',
+];
 
 function getApiKey() {
   loadEnv();
@@ -49,7 +55,7 @@ function getApiKey() {
 }
 
 /**
- * Helper to call Gemini REST API via native fetch / https
+ * Helper to call Gemini REST API with automatic model cascade failover
  */
 async function callGeminiApi(contents, systemInstruction) {
   const apiKey = getApiKey();
@@ -57,42 +63,57 @@ async function callGeminiApi(contents, systemInstruction) {
     throw new Error('GEMINI_API_KEY is not configured in backend environment');
   }
 
-  const url = `${GEMINI_ENDPOINT}?key=${apiKey}`;
-  const body = {
-    contents,
-    generationConfig: {
-      temperature: 0.2,
-      topP: 0.95,
-      responseMimeType: 'application/json',
-    },
-  };
+  let lastError = null;
 
-  if (systemInstruction) {
-    body.systemInstruction = {
-      parts: [{ text: systemInstruction }],
+  for (const model of GEMINI_MODELS) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    const body = {
+      contents,
+      generationConfig: {
+        temperature: 0.2,
+        topP: 0.95,
+        responseMimeType: 'application/json',
+      },
     };
+
+    if (systemInstruction) {
+      body.systemInstruction = {
+        parts: [{ text: systemInstruction }],
+      };
+    }
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.warn(`[Gemini Service] Model ${model} returned ${response.status}: ${errorText.slice(0, 120)}`);
+        lastError = new Error(`Gemini API Error ${response.status} on model ${model}: ${errorText}`);
+        continue; // Try next model in cascade
+      }
+
+      const data = await response.json();
+      const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!textResponse) {
+        lastError = new Error(`Empty response from Gemini API model ${model}`);
+        continue;
+      }
+
+      const parsed = JSON.parse(textResponse);
+      return parsed;
+    } catch (err) {
+      lastError = err;
+      console.warn(`[Gemini Service] Model ${model} failed: ${err.message}`);
+    }
   }
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(body),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Gemini API Error ${response.status}: ${errorText}`);
-  }
-
-  const data = await response.json();
-  const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!textResponse) {
-    throw new Error('Empty response from Gemini API');
-  }
-
-  return JSON.parse(textResponse);
+  throw lastError || new Error('All Gemini models in cascade failed');
 }
 
 /**
@@ -649,197 +670,183 @@ function getFallbackSummaryAnalysis(params) {
 }
 
 /**
- * 4. AI Food Calorie & Macro Analysis with Multimodal Vision
+ * 4. Gemini AI Food Scanner & Calorie Intake Analyzer
  */
-async function analyzeFoodImage(params) {
+async function analyzeFoodNutrition(params) {
   const {
     imageBase64 = '',
-    mimeType = 'image/jpeg',
-    userProfile = {},
-    mealType = 'Meal',
+    mealDescription = '',
+    userFitnessGoal = 'muscle building and fat loss',
   } = params || {};
 
-  const {
-    fitnessGoal = 'general_fitness',
-    weightKg = 70,
-    heightCm = 175,
-    age = 25,
-    activityLevel = 'moderate',
-    dietaryPreference = 'balanced',
-  } = userProfile || {};
+  const systemInstruction = `You are a world-class clinical sports nutritionist and registered dietitian.
+Analyze the provided food photograph or meal description with extreme precision.
+Estimate total calories, identify individual food items with realistic portions and calories, calculate macronutrients (protein, carbs, fats, fiber in grams), evaluate nutritional quality ('excellent', 'good', 'moderate', 'poor'), provide a health score (0-100), and give actionable, empathetic dietary coaching recommendations.
 
-  const systemInstruction = `You are an elite AI sports nutritionist, registered dietitian, and food computer vision analyst for the FitPilot fitness app.
-Your task:
-1. Examine the uploaded food image with high precision.
-2. Identify every distinct food item visible on the plate/container.
-3. Estimate realistic portion sizes (e.g. "1 medium bowl (150g)", "150g palm-sized", "2 slices").
-4. Estimate total calories and basic macronutrients (protein, carbs, fat in grams).
-5. Compare the meal against the user's fitness profile (Goal: ${fitnessGoal}, Weight: ${weightKg}kg, Height: ${heightCm}cm, Activity: ${activityLevel}, Diet: ${dietaryPreference}).
-6. Classify the meal into one of three statuses:
-   - "good": Well-balanced, supports the user's fitness goal. Badge: "Good choice"
-   - "could_improve": Acceptable, but has minor imbalances (e.g., low protein, excess refined carbs/oil). Badge: "Could be improved"
-   - "poor_choice": Incompatible with their goal (e.g., deep-fried, high sugar, excessive calories for weight loss). Badge: "Poor choice for your goal"
-7. Provide 2-3 practical, positive, actionable dietary suggestions (e.g. adding lean protein sources like eggs/paneer/curd, increasing vegetables, reducing fried portion). NEVER give extreme, unsafe, or dangerous crash-diet advice.
-8. If the image does NOT contain food, or is too blurry/unclear to identify:
-   Set isFood: false, totalCalories: 0, and provide confidenceNote: "Unable to estimate accurately. Please retake photo with good lighting and the entire dish visible."
-9. Always return valid JSON adhering strictly to the JSON schema.`;
+CRITICAL COACHING GUIDELINES:
+- If the meal has poor calorie density/quality (e.g., fast food, deep-fried items, high added sugars, low protein, ultra-processed):
+  * Set "quality" to "poor" or "moderate".
+  * In "geminiSuggestions", provide compassionate, actionable advice on how this affects their metabolism/recovery and how to balance it.
+  * In "healthySwaps", provide 2-3 specific, realistic ingredient or side dish substitutions to lower excess calories and boost nutritional value.
+- If the meal is healthy/nutrient-dense:
+  * Highlight the functional benefits (protein synthesis, sustained energy, micronutrients) and suggest optimal consumption timing relative to workouts.
 
-  const prompt = `User Fitness Profile:
-- Goal: ${fitnessGoal}
-- Weight: ${weightKg} kg, Height: ${heightCm} cm, Age: ${age}
-- Activity Level: ${activityLevel}
-- Dietary Preference: ${dietaryPreference}
-- Meal Type: ${mealType}
-
-Analyze the food photo and return JSON matching this exact structure:
+Return ONLY valid JSON strictly following this schema:
 {
-  "isFood": true,
-  "confidenceNote": "Estimated via Gemini computer vision. Actual calories may vary based on exact cooking oils, ingredients, and portion weights.",
-  "totalCalories": 580,
-  "proteinGrams": 38,
-  "carbsGrams": 55,
-  "fatGrams": 16,
+  "mealName": "string identified dish name",
   "foodItems": [
-    {
-      "name": "Grilled Protein",
-      "portion": "150g (approx 1 palm size)",
-      "calories": 240,
-      "protein": 32,
-      "carbs": 0,
-      "fat": 6
-    },
-    {
-      "name": "Brown Rice / Complex Carbs",
-      "portion": "1 medium cup (150g)",
-      "calories": 215,
-      "protein": 4,
-      "carbs": 45,
-      "fat": 2
-    },
-    {
-      "name": "Steamed Greens & Vegetables",
-      "portion": "1 cup (100g)",
-      "calories": 50,
-      "protein": 2,
-      "carbs": 10,
-      "fat": 1
-    }
+    { "name": "string item name", "portion": "string portion size", "calories": number }
   ],
-  "goalAlignment": {
-    "status": "good",
-    "badgeText": "Good choice",
-    "feedbackSummary": "Solid macronutrient balance with quality protein and complex carbohydrates supporting your daily fitness goals."
+  "totalCalories": number,
+  "macros": {
+    "proteinGrams": number,
+    "carbsGrams": number,
+    "fatsGrams": number,
+    "fiberGrams": number
   },
-  "suggestions": [
-    "Great lean protein foundation supporting muscle repair.",
-    "Consider adding a light splash of olive oil or seeds for healthy essential fats.",
-    "Stay hydrated with a glass of water after your meal."
-  ]
+  "quality": "excellent" | "good" | "moderate" | "poor",
+  "qualityLabel": "string short badge e.g. High Protein & Balanced or High Refined Sugar / Low Nutrient Density",
+  "healthScore": number,
+  "geminiSuggestions": "string comprehensive dietary guidance & metabolic tips",
+  "healthySwaps": ["string swap 1", "string swap 2"],
+  "confidence": number
 }`;
 
-  if (!imageBase64) {
-    return getFallbackFoodAnalysis(userProfile);
-  }
+  const promptText = `Analyze this meal photograph for calories, macros, and nutritional health status.
+User context: Goal is ${userFitnessGoal}. ${mealDescription ? `User meal note: "${mealDescription}"` : ''}`;
 
   try {
-    const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, '');
-    const parts = [
-      {
+    const parts = [{ text: promptText }];
+
+    if (imageBase64 && imageBase64.length > 50) {
+      let cleanBase64 = imageBase64;
+      let mimeType = 'image/jpeg';
+      if (imageBase64.includes(';base64,')) {
+        const split = imageBase64.split(';base64,');
+        mimeType = split[0].replace('data:', '') || 'image/jpeg';
+        cleanBase64 = split[1];
+      }
+      parts.unshift({
         inlineData: {
-          mimeType: mimeType || 'image/jpeg',
+          mimeType,
           data: cleanBase64,
         },
-      },
-      { text: prompt },
-    ];
+      });
+    }
 
     const contents = [{ role: 'user', parts }];
     const result = await callGeminiApi(contents, systemInstruction);
-
-    // Normalize and validate response
-    const isFood = result.isFood !== false;
-    const totalCalories = isFood ? Number(result.totalCalories) || 0 : 0;
-    const proteinGrams = isFood ? Number(result.proteinGrams) || 0 : 0;
-    const carbsGrams = isFood ? Number(result.carbsGrams) || 0 : 0;
-    const fatGrams = isFood ? Number(result.fatGrams) || 0 : 0;
-
-    return {
-      isFood,
-      totalCalories,
-      proteinGrams,
-      carbsGrams,
-      fatGrams,
-      foodItems: Array.isArray(result.foodItems) ? result.foodItems : [],
-      goalAlignment: result.goalAlignment || {
-        status: 'good',
-        badgeText: 'Good choice',
-        feedbackSummary: 'Balanced meal supporting your daily nutritional targets.',
-      },
-      suggestions: Array.isArray(result.suggestions) && result.suggestions.length > 0
-        ? result.suggestions
-        : ['Keep balanced portions and stay well hydrated.'],
-      confidenceNote: result.confidenceNote || 'Estimated via Gemini computer vision. Actual calories may vary.',
-      isFallback: false,
-    };
+    return { ...result, isFallback: false };
   } catch (err) {
-    console.warn(`[Gemini Service] Food analysis fallback used: ${err.message}`);
-    return getFallbackFoodAnalysis(userProfile);
+    console.warn(`[Gemini Service] Food nutrition fallback used: ${err.message}`);
+    return getFallbackFoodAnalysis(params);
   }
 }
 
-function getFallbackFoodAnalysis(userProfile = {}) {
-  const goal = (userProfile?.fitnessGoal || '').toLowerCase();
-  const isWeightLoss = goal.includes('loss') || goal.includes('cut') || goal.includes('lean');
-  const isMuscleGain = goal.includes('muscle') || goal.includes('bulk') || goal.includes('hypertrophy');
+function getFallbackFoodAnalysis(params) {
+  const desc = (params?.mealDescription || '').toLowerCase();
 
-  let status = 'good';
-  let badgeText = 'Good choice';
-  let feedbackSummary = 'Balanced macronutrient ratio with lean protein and wholesome complex carbohydrates.';
-  let suggestions = [
-    'Great lean protein foundation to aid recovery.',
-    'Add colorful leafy vegetables to boost micronutrient density.',
-    'Drink water to support digestion and metabolic health.',
-  ];
-
-  if (isWeightLoss) {
-    feedbackSummary = 'Controlled calorie density with adequate protein to preserve lean muscle while managing intake.';
-    suggestions = [
-      'Good portion control supporting your calorie deficit.',
-      'Incorporate high-fiber greens to enhance fullness.',
-      'Avoid high-calorie sugary beverages with this meal.',
-    ];
-  } else if (isMuscleGain) {
-    feedbackSummary = 'High-protein profile delivering essential amino acids for muscle protein synthesis and recovery.';
-    suggestions = [
-      'Excellent protein intake for muscle building.',
-      'Pair with complex carbs to replenish glycogen stores.',
-      'Consider adding a healthy fat source like avocado or nuts.',
-    ];
+  // 1. Poor / Fast Food category
+  if (
+    desc.includes('burger') ||
+    desc.includes('fries') ||
+    desc.includes('pizza') ||
+    desc.includes('donut') ||
+    desc.includes('soda') ||
+    desc.includes('fried') ||
+    desc.includes('chips') ||
+    desc.includes('candy')
+  ) {
+    return {
+      mealName: 'Cheeseburger & French Fries',
+      foodItems: [
+        { name: 'Cheeseburger with Beef Patty', portion: '1 regular', calories: 540 },
+        { name: 'French Fries', portion: 'Medium serving', calories: 365 },
+        { name: 'Sauce / Condiments', portion: '2 tbsp', calories: 75 },
+      ],
+      totalCalories: 980,
+      macros: {
+        proteinGrams: 28,
+        carbsGrams: 94,
+        fatsGrams: 52,
+        fiberGrams: 4,
+      },
+      quality: 'poor',
+      qualityLabel: 'High Saturated Fats & Refined Carbs',
+      healthScore: 38,
+      geminiSuggestions: '⚠️ High in saturated fats, sodium, and refined carbohydrates with limited dietary fiber. This meal may lead to a quick glucose spike followed by sluggish energy and post-meal fatigue. To improve digestion and nutrient partitioning, drink 500ml of water and go for a light 15-minute walk.',
+      healthySwaps: [
+        'Swap deep-fried fries for a side garden salad or baked sweet potato wedges (-240 kcal)',
+        'Choose a single patty with extra lettuce, tomato, and onion to increase micronutrients',
+        'Replace sugary sodas or milkshakes with sparkling water or unsweetened iced tea (-180 kcal)',
+      ],
+      confidence: 0.88,
+      isFallback: true,
+    };
   }
 
-  return {
-    isFood: true,
-    totalCalories: isWeightLoss ? 480 : isMuscleGain ? 680 : 580,
-    proteinGrams: isMuscleGain ? 44 : 34,
-    carbsGrams: isWeightLoss ? 40 : 62,
-    fatGrams: 16,
-    foodItems: [
-      {
-        name: 'Nutrient-Dense Protein Bowl',
-        portion: '1 medium bowl (approx 350g)',
-        calories: isWeightLoss ? 480 : isMuscleGain ? 680 : 580,
-        protein: isMuscleGain ? 44 : 34,
-        carbs: isWeightLoss ? 40 : 62,
-        fat: 16,
+  // 2. High Protein / Balanced Meal category
+  if (
+    desc.includes('chicken') ||
+    desc.includes('salmon') ||
+    desc.includes('salad') ||
+    desc.includes('quinoa') ||
+    desc.includes('egg') ||
+    desc.includes('rice') ||
+    desc.includes('oat')
+  ) {
+    return {
+      mealName: 'Grilled Chicken & Avocado Bowl',
+      foodItems: [
+        { name: 'Grilled Herb Chicken Breast', portion: '160g', calories: 260 },
+        { name: 'Steamed Brown Rice & Quinoa', portion: '1 cup', calories: 215 },
+        { name: 'Fresh Avocado Slices', portion: '1/2 medium', calories: 120 },
+        { name: 'Mixed Leafy Greens & Cucumbers', portion: '1.5 cups', calories: 35 },
+      ],
+      totalCalories: 630,
+      macros: {
+        proteinGrams: 44,
+        carbsGrams: 52,
+        fatsGrams: 22,
+        fiberGrams: 8,
       },
+      quality: 'excellent',
+      qualityLabel: 'High Protein & Nutrient Dense',
+      healthScore: 94,
+      geminiSuggestions: '✓ Outstanding nutritional balance! Delivers 44g of high-bioavailability protein to stimulate muscle protein synthesis, paired with complex carbohydrates and healthy monounsaturated fats from avocado for sustained mental focus and training energy. Ideal as a post-workout recovery meal within 1-2 hours.',
+      healthySwaps: [
+        'Add a squeeze of fresh lemon juice or olive oil vinaigrette for extra vitamin C and antioxidant absorption',
+        'Pair with 1 glass of water to support hydration and digestive fiber utilization',
+      ],
+      confidence: 0.94,
+      isFallback: true,
+    };
+  }
+
+  // 3. Default Balanced Athlete Meal
+  return {
+    mealName: 'Nutrient-Dense Protein Power Bowl',
+    foodItems: [
+      { name: 'Lean Protein (Chicken/Tofu)', portion: '150g', calories: 240 },
+      { name: 'Complex Carbohydrates (Rice/Grains)', portion: '1 cup', calories: 200 },
+      { name: 'Roasted Mixed Vegetables', portion: '120g', calories: 60 },
+      { name: 'Healthy Fats Dressing', portion: '1 tbsp', calories: 80 },
     ],
-    goalAlignment: {
-      status,
-      badgeText,
-      feedbackSummary,
+    totalCalories: 580,
+    macros: {
+      proteinGrams: 38,
+      carbsGrams: 48,
+      fatsGrams: 18,
+      fiberGrams: 7,
     },
-    suggestions,
-    confidenceNote: 'Estimated via Gemini computer vision. Actual calories may vary based on exact ingredients and portions.',
+    quality: 'good',
+    qualityLabel: 'Balanced Macronutrients & Whole Foods',
+    healthScore: 88,
+    geminiSuggestions: '✓ Solid whole-food meal with balanced macronutrients. Provides clean fuel for workouts and steady recovery. The 38g protein supports lean muscle retention.',
+    healthySwaps: [
+      'Include a colorful variety of bell peppers and leafy greens to maximize micronutrient diversity',
+    ],
+    confidence: 0.90,
     isFallback: true,
   };
 }
@@ -848,5 +855,6 @@ module.exports = {
   generateWorkout,
   analyzeExerciseFrame,
   analyzeWorkoutSummary,
-  analyzeFoodImage,
+  analyzeFoodNutrition,
 };
+

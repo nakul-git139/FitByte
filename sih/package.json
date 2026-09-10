@@ -18,6 +18,7 @@
     "expo-asset": "~57.0.16",
     "expo-camera": "~57.0.4",
     "expo-haptics": "~57.0.2",
+    "expo-image-picker": "~57.0.16",
     "expo-speech": "~57.0.2",
     "expo-status-bar": "~57.0.1",
     "jsonwebtoken": "^9.0.3",

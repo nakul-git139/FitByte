@@ -1,15 +1,15 @@
 import { WorkoutSessionRecord } from '../types/workout';
 import { User } from '../types/auth';
-import { MealLogRecord } from '../types/food';
+import { FoodLogRecord, DailyNutritionSummary } from '../types/nutrition';
 
 const STORAGE_KEY = 'FITPILOT_WORKOUT_HISTORY_V1';
-const MEAL_STORAGE_KEY = 'FITPILOT_MEAL_HISTORY_V1';
+const FOOD_STORAGE_KEY = 'FITPILOT_FOOD_LOGS_V1';
 const AUTH_STORAGE_KEY = 'FITPILOT_AUTH_SESSION_V1';
 const LEGACY_AUTH_STORAGE_KEY = 'FITBYTE_AUTH_SESSION_V1';
 
 // In-memory cache fallback
 let memoryHistory: WorkoutSessionRecord[] = [];
-let memoryMealHistory: MealLogRecord[] = [];
+let memoryFoodLogs: FoodLogRecord[] = [];
 let memoryAuthSession: { token: string; user: User } | null = null;
 
 export interface DashboardStats {
@@ -299,56 +299,83 @@ export class StorageService {
   }
 
   /**
-   * Retrieves all saved meal logs sorted by date (newest first)
+   * Retrieves all saved food intake logs sorted by date (newest first)
    */
-  public static async getMealHistory(): Promise<MealLogRecord[]> {
+  public static async getFoodLogs(): Promise<FoodLogRecord[]> {
     try {
       if (typeof globalThis !== 'undefined' && (globalThis as any).localStorage) {
-        const raw = (globalThis as any).localStorage.getItem(MEAL_STORAGE_KEY);
+        const raw = (globalThis as any).localStorage.getItem(FOOD_STORAGE_KEY);
         if (raw) {
           const parsed = JSON.parse(raw);
           if (Array.isArray(parsed)) {
-            memoryMealHistory = parsed;
+            memoryFoodLogs = parsed;
             return parsed;
           }
         }
       }
     } catch (e) {
-      console.warn('[StorageService] Error reading meal localStorage:', e);
+      console.warn('[StorageService] Error reading food logs:', e);
     }
-
-    return [...memoryMealHistory];
+    return [...memoryFoodLogs];
   }
 
   /**
-   * Saves a analyzed meal record to persistent history
+   * Saves a food log entry to persistent history
    */
-  public static async saveMealLog(meal: MealLogRecord): Promise<void> {
+  public static async saveFoodLog(log: FoodLogRecord): Promise<void> {
     try {
-      const history = await this.getMealHistory();
-      const updated = [meal, ...history.filter((m) => m.id !== meal.id)].slice(0, 50);
-      memoryMealHistory = updated;
+      const existing = await this.getFoodLogs();
+      const updated = [log, ...existing.filter((item) => item.id !== log.id)].slice(0, 100);
+      memoryFoodLogs = updated;
 
       if (typeof globalThis !== 'undefined' && (globalThis as any).localStorage) {
-        (globalThis as any).localStorage.setItem(MEAL_STORAGE_KEY, JSON.stringify(updated));
+        (globalThis as any).localStorage.setItem(FOOD_STORAGE_KEY, JSON.stringify(updated));
       }
     } catch (e) {
-      console.warn('[StorageService] Error saving meal log:', e);
-      memoryMealHistory = [meal, ...memoryMealHistory].slice(0, 50);
+      console.warn('[StorageService] Error saving food log:', e);
+      memoryFoodLogs = [log, ...memoryFoodLogs].slice(0, 100);
     }
   }
 
   /**
-   * Clears meal history
+   * Computes today's (or given date's) nutrition summary
    */
-  public static async clearMealHistory(): Promise<void> {
-    memoryMealHistory = [];
+  public static async getDailyNutritionSummary(targetDateStr?: string): Promise<DailyNutritionSummary> {
+    const today = new Date();
+    const targetDate = targetDateStr || `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+    const logs = await this.getFoodLogs();
+    const todayLogs = logs.filter((log) => log.date === targetDate);
+
+    const totalCaloriesConsumed = todayLogs.reduce((sum, item) => sum + (item.totalCalories || 0), 0);
+    const totalProteinGrams = todayLogs.reduce((sum, item) => sum + (item.macros?.proteinGrams || 0), 0);
+    const totalCarbsGrams = todayLogs.reduce((sum, item) => sum + (item.macros?.carbsGrams || 0), 0);
+    const totalFatsGrams = todayLogs.reduce((sum, item) => sum + (item.macros?.fatsGrams || 0), 0);
+    const totalFiberGrams = todayLogs.reduce((sum, item) => sum + (item.macros?.fiberGrams || 0), 0);
+
+    return {
+      date: targetDate,
+      totalCaloriesConsumed,
+      totalProteinGrams,
+      totalCarbsGrams,
+      totalFatsGrams,
+      totalFiberGrams,
+      mealCount: todayLogs.length,
+      loggedMeals: todayLogs,
+    };
+  }
+
+  /**
+   * Clears saved food logs
+   */
+  public static async clearFoodLogs(): Promise<void> {
+    memoryFoodLogs = [];
     try {
       if (typeof globalThis !== 'undefined' && (globalThis as any).localStorage) {
-        (globalThis as any).localStorage.removeItem(MEAL_STORAGE_KEY);
+        (globalThis as any).localStorage.removeItem(FOOD_STORAGE_KEY);
       }
     } catch (e) {
-      console.warn('[StorageService] Error clearing meal storage:', e);
+      console.warn('[StorageService] Error clearing food logs:', e);
     }
   }
 }

@@ -2,12 +2,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
-const {
-  generateWorkout,
-  analyzeExerciseFrame,
-  analyzeWorkoutSummary,
-  analyzeFoodImage,
-} = require('./geminiService');
+const { generateWorkout, analyzeExerciseFrame, analyzeWorkoutSummary, analyzeFoodNutrition } = require('./geminiService');
 const userStore = require('./userStore');
 const {
   hashPassword,
@@ -137,15 +132,15 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // API 4: AI Food Calorie & Macro Vision Analysis
-  if (url === '/api/food/analyze' && req.method === 'POST') {
+  // API 4: Gemini AI Food & Calorie Intake Scanner
+  if (url === '/api/nutrition/analyze-food' && req.method === 'POST') {
     try {
       const body = await parseRequestBody(req);
-      const foodAnalysis = await analyzeFoodImage(body);
+      const foodAnalysis = await analyzeFoodNutrition(body);
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(foodAnalysis));
     } catch (err) {
-      console.error('[Server] /api/food/analyze error:', err.message);
+      console.error('[Server] /api/nutrition/analyze-food error:', err.message);
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: err.message }));
     }

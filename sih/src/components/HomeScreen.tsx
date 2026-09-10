@@ -12,6 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { StorageService, DashboardStats } from '../services/storageService';
+import { DailyNutritionSummary } from '../types/nutrition';
 import { User } from '../types/auth';
 import { Theme } from '../config/theme';
 
@@ -21,7 +22,7 @@ interface HomeScreenProps {
   onSelectQuickExercise: (exerciseName: string) => void;
   onNavigateToWorkouts: () => void;
   onNavigateToProfile: () => void;
-  onScanFood?: () => void;
+  onNavigateToFoodScanner?: () => void;
 }
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
@@ -30,7 +31,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onSelectQuickExercise,
   onNavigateToWorkouts,
   onNavigateToProfile,
-  onScanFood,
+  onNavigateToFoodScanner,
 }) => {
   const [stats, setStats] = useState<DashboardStats>({
     totalWorkouts: 0,
@@ -41,6 +42,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     weekDayActive: [false, false, false, false, false, false, false],
     recentWorkouts: [],
   });
+  const [nutritionSummary, setNutritionSummary] = useState<DailyNutritionSummary | null>(null);
 
   useEffect(() => {
     StorageService.getDashboardStats()
@@ -48,6 +50,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         setStats(data);
       })
       .catch((e) => console.warn('[HomeScreen] Error loading stats:', e));
+
+    StorageService.getDailyNutritionSummary()
+      .then((data) => {
+        setNutritionSummary(data);
+      })
+      .catch((e) => console.warn('[HomeScreen] Error loading nutrition summary:', e));
   }, []);
 
   const handleStartWorkout = () => {
@@ -172,42 +180,54 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </View>
         </View>
 
-        {/* 3. AI MEAL CALORIE SCANNER Banner */}
-        {onScanFood && (
-          <TouchableOpacity
-            style={styles.foodScannerBanner}
-            onPress={() => {
-              try {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              } catch {}
-              onScanFood();
-            }}
-            activeOpacity={0.85}
-          >
-            <View style={styles.foodScannerLeft}>
-              <View style={styles.foodScannerTag}>
-                <Ionicons name="sparkles" size={12} color={Theme.colors.primaryGreen} />
-                <Text style={styles.foodScannerTagText}>GEMINI NUTRITION</Text>
+        {/* 2.5 AI Nutrition & Calorie Scanner Card */}
+        {onNavigateToFoodScanner && (
+          <View style={styles.nutritionCard}>
+            <View style={styles.nutritionCardHeader}>
+              <View style={styles.nutritionIconCircle}>
+                <Ionicons name="nutrition" size={20} color={Theme.colors.primaryGreen} />
               </View>
-              <Text style={styles.foodScannerTitle}>AI Food Calorie Scanner</Text>
-              <Text style={styles.foodScannerDesc}>
-                Snap your meal to estimate calories, macros & get personalized feedback.
-              </Text>
-              <View style={styles.foodScannerCta}>
-                <Ionicons name="camera" size={15} color="#FFFFFF" />
-                <Text style={styles.foodScannerCtaText}>Scan Food</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.nutritionCardTitle}>AI Calorie & Meal Scanner</Text>
+                <Text style={styles.nutritionCardSub}>
+                  Snap a photo of your food for instant calories, macros & AI coaching suggestions.
+                </Text>
               </View>
             </View>
 
-            <Image
-              source={{ uri: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=400&q=80' }}
-              style={styles.foodScannerImage}
-              resizeMode="cover"
-            />
-          </TouchableOpacity>
+            {nutritionSummary && nutritionSummary.totalCaloriesConsumed > 0 && (
+              <View style={styles.intakeStatsRow}>
+                <View style={styles.intakeStatItem}>
+                  <Text style={styles.intakeStatValue}>{nutritionSummary.totalCaloriesConsumed} kcal</Text>
+                  <Text style={styles.intakeStatLabel}>Consumed Today</Text>
+                </View>
+                <View style={styles.intakeDivider} />
+                <View style={styles.intakeStatItem}>
+                  <Text style={styles.intakeStatValue}>{nutritionSummary.totalProteinGrams}g</Text>
+                  <Text style={styles.intakeStatLabel}>Protein</Text>
+                </View>
+                <View style={styles.intakeDivider} />
+                <View style={styles.intakeStatItem}>
+                  <Text style={styles.intakeStatValue}>
+                    {nutritionSummary.mealCount} {nutritionSummary.mealCount === 1 ? 'meal' : 'meals'}
+                  </Text>
+                  <Text style={styles.intakeStatLabel}>Logged</Text>
+                </View>
+              </View>
+            )}
+
+            <TouchableOpacity
+              style={styles.scanMealButton}
+              onPress={onNavigateToFoodScanner}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="camera" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+              <Text style={styles.scanMealButtonText}>Scan Meal</Text>
+            </TouchableOpacity>
+          </View>
         )}
 
-        {/* 4. QUICK START Section */}
+        {/* 3. QUICK START Section */}
         <View style={styles.sectionHeaderRow}>
           <Text style={styles.sectionTitle}>Quick Start</Text>
           <TouchableOpacity onPress={onNavigateToWorkouts} activeOpacity={0.7}>
@@ -448,69 +468,81 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  foodScannerBanner: {
-    flexDirection: 'row',
+  nutritionCard: {
     backgroundColor: Theme.colors.surface,
+    padding: Theme.spacing.base,
     borderRadius: Theme.borderRadius.xl,
     borderWidth: 1,
     borderColor: Theme.colors.borderSubtle,
-    overflow: 'hidden',
-    marginBottom: Theme.spacing.lg,
-    ...Theme.shadows.card,
-  },
-  foodScannerLeft: {
-    flex: 1,
-    padding: Theme.spacing.md,
-    justifyContent: 'center',
-  },
-  foodScannerTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    alignSelf: 'flex-start',
-    backgroundColor: Theme.colors.lightGreen,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: Theme.borderRadius.full,
-    marginBottom: 6,
-  },
-  foodScannerTagText: {
-    color: Theme.colors.primaryGreenDark,
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  foodScannerTitle: {
-    fontSize: Theme.typography.sizes.sm + 1,
-    fontWeight: '800',
-    color: Theme.colors.textPrimary,
-    marginBottom: 4,
-  },
-  foodScannerDesc: {
-    fontSize: 11,
-    color: Theme.colors.textSecondary,
-    lineHeight: 16,
-    marginBottom: 10,
-  },
-  foodScannerCta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: Theme.colors.primaryGreen,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: Theme.borderRadius.full,
-    alignSelf: 'flex-start',
+    marginBottom: Theme.spacing.xl,
     ...Theme.shadows.soft,
   },
-  foodScannerCtaText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '700',
+  nutritionCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: Theme.spacing.md,
   },
-  foodScannerImage: {
-    width: 110,
-    height: '100%',
-    minHeight: 140,
+  nutritionIconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Theme.colors.lightGreen,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  nutritionCardTitle: {
+    fontSize: Theme.typography.sizes.base,
+    fontWeight: '800',
+    color: Theme.colors.textPrimary,
+  },
+  nutritionCardSub: {
+    fontSize: Theme.typography.sizes.xs,
+    color: Theme.colors.textSecondary,
+    marginTop: 2,
+    lineHeight: 16,
+  },
+  intakeStatsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    backgroundColor: Theme.colors.surfaceSecondary,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderRadius: Theme.borderRadius.lg,
+    marginBottom: Theme.spacing.md,
+  },
+  intakeStatItem: {
+    alignItems: 'center',
+  },
+  intakeStatValue: {
+    fontSize: Theme.typography.sizes.sm,
+    fontWeight: '800',
+    color: Theme.colors.primaryGreenDark,
+  },
+  intakeStatLabel: {
+    fontSize: 10,
+    color: Theme.colors.textSecondary,
+    marginTop: 2,
+    fontWeight: '500',
+  },
+  intakeDivider: {
+    width: 1,
+    height: 24,
+    backgroundColor: Theme.colors.borderSubtle,
+  },
+  scanMealButton: {
+    backgroundColor: Theme.colors.primaryGreen,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: Theme.borderRadius.lg,
+    ...Theme.shadows.card,
+  },
+  scanMealButtonText: {
+    color: '#FFFFFF',
+    fontSize: Theme.typography.sizes.sm,
+    fontWeight: '700',
   },
 });
