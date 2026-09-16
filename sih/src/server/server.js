@@ -11,6 +11,8 @@ const {
   verifyToken,
   verifyGoogleToken,
 } = require('./authService');
+const CommunityController = require('./community/communityController');
+const communityWs = require('./community/communityWs');
 
 const PORT = 8999;
 const HTML_PATH = path.join(__dirname, 'pose_detector.html');
@@ -330,58 +332,204 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ==========================================
+  // COMMUNITY ENDPOINTS
+  // ==========================================
+
+  // Community Static Uploads: GET /api/community/uploads/:filename
+  if (url.startsWith('/api/community/uploads/') && req.method === 'GET') {
+    const filename = url.replace('/api/community/uploads/', '');
+    CommunityController.serveUpload(req, res, filename);
+    return;
+  }
+
+  // Community Image Upload: POST /api/community/upload
+  if (url === '/api/community/upload' && req.method === 'POST') {
+    try {
+      const body = await parseRequestBody(req);
+      await CommunityController.uploadImage(req, res, body);
+    } catch (err) {
+      res.writeHead(err.statusCode || 500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: err.message }));
+    }
+    return;
+  }
+
+  // Community Posts Collection: GET (Paginated feed), POST (Create post)
+  if (url === '/api/community/posts') {
+    const parsedUrl = new URL(req.url, `http://localhost:${PORT}`);
+    if (req.method === 'GET') {
+      await CommunityController.getPosts(req, res, parsedUrl.searchParams);
+      return;
+    }
+    if (req.method === 'POST') {
+      try {
+        const body = await parseRequestBody(req);
+        await CommunityController.createPost(req, res, body);
+      } catch (err) {
+        res.writeHead(err.statusCode || 500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: err.message }));
+      }
+      return;
+    }
+  }
+
+  // Community Reports: POST /api/community/reports
+  if (url === '/api/community/reports' && req.method === 'POST') {
+    try {
+      const body = await parseRequestBody(req);
+      await CommunityController.createReport(req, res, body);
+    } catch (err) {
+      res.writeHead(err.statusCode || 500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: err.message }));
+    }
+    return;
+  }
+
+  // Single Post Comments: GET /api/community/posts/:id/comments, POST /api/community/posts/:id/comments
+  const postCommentsMatch = url.match(/^\/api\/community\/posts\/([a-zA-Z0-9_-]+)\/comments$/);
+  if (postCommentsMatch) {
+    const postId = postCommentsMatch[1];
+    const parsedUrl = new URL(req.url, `http://localhost:${PORT}`);
+    if (req.method === 'GET') {
+      await CommunityController.getComments(req, res, postId, parsedUrl.searchParams);
+      return;
+    }
+    if (req.method === 'POST') {
+      try {
+        const body = await parseRequestBody(req);
+        await CommunityController.addComment(req, res, postId, body);
+      } catch (err) {
+        res.writeHead(err.statusCode || 500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: err.message }));
+      }
+      return;
+    }
+  }
+
+  // Single Post Likes: POST /api/community/posts/:id/like, DELETE /api/community/posts/:id/like, POST /api/community/posts/:id/unlike
+  const postLikeMatch = url.match(/^\/api\/community\/posts\/([a-zA-Z0-9_-]+)\/like$/);
+  if (postLikeMatch) {
+    const postId = postLikeMatch[1];
+    if (req.method === 'POST') {
+      await CommunityController.likePost(req, res, postId);
+      return;
+    }
+    if (req.method === 'DELETE') {
+      await CommunityController.unlikePost(req, res, postId);
+      return;
+    }
+  }
+
+  const postUnlikeMatch = url.match(/^\/api\/community\/posts\/([a-zA-Z0-9_-]+)\/unlike$/);
+  if (postUnlikeMatch && req.method === 'POST') {
+    const postId = postUnlikeMatch[1];
+    await CommunityController.unlikePost(req, res, postId);
+    return;
+  }
+
+  // Single Post: GET /api/community/posts/:id, DELETE /api/community/posts/:id
+  const singlePostMatch = url.match(/^\/api\/community\/posts\/([a-zA-Z0-9_-]+)$/);
+  if (singlePostMatch) {
+    const postId = singlePostMatch[1];
+    if (req.method === 'GET') {
+      await CommunityController.getPostById(req, res, postId);
+      return;
+    }
+    if (req.method === 'DELETE') {
+      await CommunityController.deletePost(req, res, postId);
+      return;
+    }
+  }
+
+  // Single Comment Deletion: DELETE /api/community/comments/:id
+  const singleCommentMatch = url.match(/^\/api\/community\/comments\/([a-zA-Z0-9_-]+)$/);
+  if (singleCommentMatch && req.method === 'DELETE') {
+    const commentId = singleCommentMatch[1];
+    await CommunityController.deleteComment(req, res, commentId);
+    return;
+  }
+
   res.writeHead(404, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify({ error: 'Endpoint Not Found' }));
 });
 
+const os = require('os');
+
+function getLocalIp() {
+  try {
+    const interfaces = os.networkInterfaces();
+    for (const name of Object.keys(interfaces)) {
+      for (const iface of interfaces[name]) {
+        if (iface.family === 'IPv4' && !iface.internal) {
+          return iface.address;
+        }
+      }
+    }
+  } catch (e) {}
+  return 'localhost';
+}
+
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`[Pose & Gemini Server] Local server running on http://localhost:${PORT}`);
+  const localIp = getLocalIp();
+  console.log(`[Pose & Gemini Server] Local server running on http://localhost:${PORT} and http://${localIp}:${PORT}`);
+
+  try {
+    fs.writeFileSync(CONFIG_PATH, JSON.stringify({
+      url: `http://${localIp}:${PORT}`,
+      updatedAt: new Date().toISOString()
+    }, null, 2));
+    console.log(`[Pose Server] LAN IP Config saved to ${CONFIG_PATH}`);
+  } catch (e) {}
+
+  communityWs.init(server);
   startTunnel();
 });
 
-// 2. Start Secure HTTPS Tunnel via Pinggy
+// 2. Start Secure HTTPS Tunnel via localhost.run
 function startTunnel() {
   console.log('[Pose Server] Establishing HTTPS Tunnel...');
 
-  const tunnel = spawn('ssh', [
-    '-o', 'StrictHostKeyChecking=no',
-    '-o', 'ServerAliveInterval=30',
-    '-p', '443',
-    '-R0:localhost:' + PORT,
-    'a.pinggy.io'
-  ]);
+  try {
+    const tunnel = spawn('ssh', [
+      '-o', 'StrictHostKeyChecking=no',
+      '-o', 'ServerAliveInterval=30',
+      '-R', `80:localhost:${PORT}`,
+      'nokey@localhost.run'
+    ]);
 
-  let foundUrl = false;
+    let foundUrl = false;
 
-  tunnel.stdout.on('data', (data) => {
-    const text = data.toString();
-    const match = text.match(/https:\/\/[a-zA-Z0-9-]+\.free\.pinggy\.net/) ||
-                  text.match(/https:\/\/[a-zA-Z0-9-]+\.run\.pinggy-free\.link/);
+    tunnel.stdout.on('data', (data) => {
+      const text = data.toString();
+      const match = text.match(/https:\/\/[a-zA-Z0-9-]+\.(?:lhr\.life|lhrtunnel\.link)/) ||
+                    text.match(/https:\/\/[a-zA-Z0-9-]+\.loca\.lt/);
 
-    if (match && !foundUrl) {
-      foundUrl = true;
-      const httpsUrl = match[0];
-      console.log(`\n==============================================`);
-      console.log(`🚀 Real-Time MediaPipe & Gemini HTTPS Tunnel Ready:`);
-      console.log(`🔗 ${httpsUrl}`);
-      console.log(`==============================================\n`);
+      if (match && !foundUrl) {
+        foundUrl = true;
+        const httpsUrl = match[0];
+        console.log(`\n==============================================`);
+        console.log(`🚀 Public HTTPS Tunnel Ready for All Devices:`);
+        console.log(`🔗 ${httpsUrl}`);
+        console.log(`==============================================\n`);
 
-      const configData = {
-        url: httpsUrl,
-        updatedAt: new Date().toISOString()
-      };
+        const configData = {
+          url: httpsUrl,
+          updatedAt: new Date().toISOString()
+        };
 
-      fs.writeFileSync(CONFIG_PATH, JSON.stringify(configData, null, 2));
-      console.log(`[Pose Server] Config saved to ${CONFIG_PATH}`);
-    }
-  });
+        fs.writeFileSync(CONFIG_PATH, JSON.stringify(configData, null, 2));
+        console.log(`[Pose Server] Tunnel Config saved to ${CONFIG_PATH}`);
+      }
+    });
 
-  tunnel.stderr.on('data', (data) => {
-    // Pinggy banner info
-  });
+    tunnel.stderr.on('data', (data) => {});
 
-  tunnel.on('close', (code) => {
-    console.log(`[Pose Server] Tunnel closed (code ${code}), restarting in 5s...`);
-    setTimeout(startTunnel, 5000);
-  });
+    tunnel.on('close', (code) => {
+      console.log(`[Pose Server] Tunnel closed (code ${code}), restarting in 5s...`);
+      setTimeout(startTunnel, 5000);
+    });
+  } catch (e) {
+    console.warn('[Pose Server] Tunnel spawn error:', e.message);
+  }
 }

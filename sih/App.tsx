@@ -17,6 +17,7 @@ import { WorkoutReadyScreen } from './src/components/WorkoutReadyScreen';
 import { WorkoutCameraScreen } from './src/components/WorkoutCameraScreen';
 import { FoodScannerScreen } from './src/components/FoodScannerScreen';
 import { UserProfileSetupScreen } from './src/components/UserProfileSetupScreen';
+import { CommunityScreen } from './src/components/community/CommunityScreen';
 
 import { AuthService } from './src/services/authService';
 import { StorageService } from './src/services/storageService';
@@ -226,6 +227,13 @@ export default function App() {
                 }}
                 onBack={() => setActiveTab('home')}
                 onOpenSettings={() => setActiveTab('profile')}
+              />
+            )}
+
+            {activeTab === 'community' && (
+              <CommunityScreen
+                currentUser={currentUser}
+                onOpenAuth={() => setCurrentView('auth')}
               />
             )}
 

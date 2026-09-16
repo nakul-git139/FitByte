@@ -94,6 +94,14 @@ export const WorkoutSummaryModal: React.FC<WorkoutSummaryModalProps> = ({
               </View>
             )}
 
+            {/* Daily Streak Active Banner */}
+            <View style={styles.streakCelebrationCard}>
+              <Text style={{ fontSize: 16 }}>🔥</Text>
+              <Text style={styles.streakCelebrationText}>
+                Daily Streak Active • Workout Successfully Completed!
+              </Text>
+            </View>
+
             {/* Stats 2x2 Grid */}
             <View style={styles.statsGrid}>
               {/* Reps */}
@@ -239,6 +247,23 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: Theme.colors.primaryGreenDark,
     letterSpacing: 0.5,
+  },
+  streakCelebrationCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: Theme.borderRadius.full,
+    marginBottom: Theme.spacing.lg,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  streakCelebrationText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#92400E',
   },
   statsGrid: {
     width: '100%',

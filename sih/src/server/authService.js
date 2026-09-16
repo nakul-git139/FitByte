@@ -43,11 +43,20 @@ function generateToken(user) {
 }
 
 /**
- * Verify and decode a JWT
+ * Verify and decode a JWT or local dev session token
  */
 function verifyToken(token) {
   if (!token) {
     throw new Error('No token provided');
+  }
+
+  if (typeof token === 'string' && (token.startsWith('local_') || token.startsWith('mock_'))) {
+    return {
+      userId: 'usr_local_athlete',
+      email: 'athlete@fitpilot.app',
+      name: 'Athlete',
+      authProvider: 'local',
+    };
   }
 
   try {

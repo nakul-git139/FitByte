@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Theme } from '../config/theme';
 
-export type MainTabType = 'home' | 'workout' | 'progress' | 'profile';
+export type MainTabType = 'home' | 'workout' | 'community' | 'progress' | 'profile';
 
 interface BottomNavBarProps {
   activeTab: MainTabType;
@@ -27,6 +27,7 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({ activeTab, onTabSele
   }> = [
     { id: 'home', label: 'Home', icon: 'home-outline', activeIcon: 'home' },
     { id: 'workout', label: 'Workout', icon: 'barbell-outline', activeIcon: 'barbell' },
+    { id: 'community', label: 'Community', icon: 'people-outline', activeIcon: 'people' },
     { id: 'progress', label: 'Progress', icon: 'bar-chart-outline', activeIcon: 'bar-chart' },
     { id: 'profile', label: 'Profile', icon: 'person-outline', activeIcon: 'person' },
   ];

@@ -379,13 +379,35 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
               Connect your Google account with FitPilot to personalize workouts and track progress.
             </Text>
 
+            {/* Quick 1-Tap Account Selector */}
+            <TouchableOpacity
+              style={styles.googleQuickPill}
+              onPress={() => executeGoogleAuth('alex.athlete@gmail.com', 'Alex Rivera')}
+              activeOpacity={0.8}
+            >
+              <View style={styles.googleAvatarBadge}>
+                <Text style={styles.googleAvatarLetter}>A</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.googleQuickName}>Alex Rivera</Text>
+                <Text style={styles.googleQuickEmail}>alex.athlete@gmail.com</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={Theme.colors.textMuted} />
+            </TouchableOpacity>
+
+            <View style={styles.dividerRowSmall}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerTextSmall}>OR ENTER ACCOUNT</Text>
+              <View style={styles.dividerLine} />
+            </View>
+
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Google Account Name</Text>
               <View style={styles.inputWrapper}>
                 <Ionicons name="person-outline" size={18} color={Theme.colors.textSecondary} style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
-                  placeholder="e.g. Alex Rivera"
+                  placeholder="e.g. John Doe"
                   placeholderTextColor={Theme.colors.textMuted}
                   value={googleNameInput}
                   onChangeText={setGoogleNameInput}
@@ -400,7 +422,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                 <Ionicons name="mail-outline" size={18} color={Theme.colors.textSecondary} style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
-                  placeholder="alex.athlete@gmail.com"
+                  placeholder="name@gmail.com"
                   placeholderTextColor={Theme.colors.textMuted}
                   value={googleEmailInput}
                   onChangeText={setGoogleEmailInput}
@@ -413,10 +435,10 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
 
             <TouchableOpacity
               style={styles.googleConfirmButton}
-              onPress={() => executeGoogleAuth(googleEmailInput, googleNameInput)}
+              onPress={() => executeGoogleAuth(googleEmailInput || 'athlete@gmail.com', googleNameInput || 'Athlete')}
               activeOpacity={0.85}
             >
-              <Text style={styles.googleConfirmButtonText}>Continue with Account</Text>
+              <Text style={styles.googleConfirmButtonText}>Continue with Google</Text>
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
@@ -670,6 +692,52 @@ const styles = StyleSheet.create({
     color: Theme.colors.textSecondary,
     marginBottom: Theme.spacing.lg,
     lineHeight: 20,
+  },
+  googleQuickPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Theme.colors.surfaceSecondary,
+    padding: Theme.spacing.md,
+    borderRadius: Theme.borderRadius.lg,
+    borderWidth: 1,
+    borderColor: Theme.colors.borderSubtle,
+    marginBottom: Theme.spacing.md,
+    gap: 12,
+  },
+  googleAvatarBadge: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#EA4335',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  googleAvatarLetter: {
+    color: '#FFFFFF',
+    fontSize: Theme.typography.sizes.base,
+    fontWeight: '700',
+  },
+  googleQuickName: {
+    fontSize: Theme.typography.sizes.base,
+    fontWeight: '700',
+    color: Theme.colors.textPrimary,
+  },
+  googleQuickEmail: {
+    fontSize: Theme.typography.sizes.xs,
+    color: Theme.colors.textSecondary,
+    marginTop: 2,
+  },
+  dividerRowSmall: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: Theme.spacing.md,
+  },
+  dividerTextSmall: {
+    paddingHorizontal: Theme.spacing.sm,
+    fontSize: 10,
+    fontWeight: '700',
+    color: Theme.colors.textMuted,
+    letterSpacing: 0.8,
   },
   googleConfirmButton: {
     backgroundColor: Theme.colors.primaryGreen,

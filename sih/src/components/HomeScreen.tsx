@@ -39,6 +39,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     totalCalories: 0,
     averageFormScore: 0,
     dayStreak: 0,
+    longestStreak: 0,
     weekDayActive: [false, false, false, false, false, false, false],
     recentWorkouts: [],
   });
@@ -171,11 +172,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           {/* Streak Card */}
           <View style={styles.metricCard}>
             <View style={styles.metricIconCircle}>
-              <Ionicons name="trophy" size={20} color="#D97706" />
+              <Text style={{ fontSize: 20 }}>🔥</Text>
             </View>
             <View>
-              <Text style={styles.metricValue}>{stats.dayStreak} day streak</Text>
-              <Text style={styles.metricLabel}>Consistency</Text>
+              <Text style={styles.metricValue}>
+                {stats.dayStreak} {stats.dayStreak === 1 ? 'day' : 'days'}
+              </Text>
+              <Text style={styles.metricLabel}>
+                {stats.longestStreak > 1 ? `Best: ${stats.longestStreak}d` : 'Daily streak'}
+              </Text>
             </View>
           </View>
         </View>

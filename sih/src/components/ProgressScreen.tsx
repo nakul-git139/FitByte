@@ -30,6 +30,7 @@ export const ProgressScreen: React.FC<ProgressScreenProps> = ({
     totalCalories: 0,
     averageFormScore: 0,
     dayStreak: 0,
+    longestStreak: 0,
     weekDayActive: [false, false, false, false, false, false, false],
     recentWorkouts: [],
   });
@@ -74,6 +75,32 @@ export const ProgressScreen: React.FC<ProgressScreenProps> = ({
         <View style={styles.headerSection}>
           <Text style={styles.mainTitle}>Your Progress</Text>
           <Text style={styles.subtitle}>You're building a habit. Keep going.</Text>
+        </View>
+
+        {/* Streak & Consistency Highlight Card */}
+        <View style={styles.streakHighlightCard}>
+          <View style={styles.streakHighlightLeft}>
+            <View style={styles.streakEmojiCircle}>
+              <Text style={{ fontSize: 22 }}>🔥</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.streakCountText}>
+                {stats.dayStreak} {stats.dayStreak === 1 ? 'Day Streak' : 'Day Streak'}
+              </Text>
+              <Text style={styles.streakSubtext}>
+                {stats.dayStreak > 0
+                  ? 'Consistency is your superpower!'
+                  : 'Complete a workout today to start your streak!'}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.longestStreakBadge}>
+            <Ionicons name="trophy" size={13} color="#D97706" />
+            <Text style={styles.longestStreakText}>
+              Best: {stats.longestStreak > 0 ? stats.longestStreak : stats.dayStreak}d
+            </Text>
+          </View>
         </View>
 
         {/* 1. Time Range Switcher (Week | Month | Year) */}
@@ -451,5 +478,56 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: Theme.typography.sizes.xs + 1,
     fontWeight: '700',
+  },
+  streakHighlightCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: Theme.colors.surface,
+    padding: Theme.spacing.base,
+    borderRadius: Theme.borderRadius.xl,
+    borderWidth: 1,
+    borderColor: Theme.colors.borderSubtle,
+    marginBottom: Theme.spacing.md,
+    ...Theme.shadows.soft,
+  },
+  streakHighlightLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  streakEmojiCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: Theme.colors.lightGreen,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  streakCountText: {
+    fontSize: Theme.typography.sizes.base,
+    fontWeight: '800',
+    color: Theme.colors.textPrimary,
+  },
+  streakSubtext: {
+    fontSize: 11,
+    color: Theme.colors.textSecondary,
+    marginTop: 2,
+  },
+  longestStreakBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: Theme.borderRadius.full,
+    marginLeft: 8,
+  },
+  longestStreakText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#92400E',
   },
 });

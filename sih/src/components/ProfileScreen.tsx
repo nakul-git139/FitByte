@@ -51,6 +51,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     totalCalories: 0,
     averageFormScore: 0,
     dayStreak: 0,
+    longestStreak: 0,
     weekDayActive: [false, false, false, false, false, false, false],
     recentWorkouts: [],
   });
@@ -135,7 +136,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         {/* 2. Stat Pills Row (Day streak | Workouts | Avg form) */}
         <View style={styles.statPillsRow}>
           <View style={styles.statPillCard}>
-            <Text style={styles.statPillValue}>{stats.dayStreak}</Text>
+            <Text style={styles.statPillValue}>🔥 {stats.dayStreak}</Text>
             <Text style={styles.statPillLabel}>Day streak</Text>
           </View>
 

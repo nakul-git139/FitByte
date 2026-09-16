@@ -1,0 +1,205 @@
+{
+  "posts": [
+    {
+      "id": "post_1789561911746_48400964",
+      "userId": "usr_1789561685532_7993df32",
+      "userName": "Alex Rivera",
+      "userAvatar": "https://lh3.googleusercontent.com/a/default-user",
+      "imageUrl": "/api/community/uploads/post_1789561910888_40c4b1630337.jpg",
+      "caption": "Nigga for sale",
+      "createdAt": "2026-09-16T12:31:51.746Z",
+      "updatedAt": "2026-09-16T14:12:59.598Z",
+      "likesCount": 2,
+      "commentsCount": 1
+    },
+    {
+      "id": "post_1789561623268_7d41e1f1",
+      "userId": "usr_1789561623258_0284b0a8",
+      "userName": "Runner Athlete",
+      "userAvatar": null,
+      "imageUrl": "",
+      "caption": "Just completed 5k run in 22 minutes! Great progress this month 🏃💨",
+      "createdAt": "2026-09-16T12:27:03.268Z",
+      "updatedAt": "2026-09-16T12:27:03.268Z",
+      "likesCount": 0,
+      "commentsCount": 0
+    },
+    {
+      "id": "post_1789561623267_446f1e96",
+      "userId": "usr_1789561623258_0284b0a8",
+      "userName": "Runner Athlete",
+      "userAvatar": null,
+      "imageUrl": "/api/community/uploads/post_1789561623267_41c95f213d6e.jpg",
+      "caption": "Morning calisthenics flow completed! ⚡🏃",
+      "createdAt": "2026-09-16T12:27:03.267Z",
+      "updatedAt": "2026-09-16T12:27:03.267Z",
+      "likesCount": 0,
+      "commentsCount": 0
+    },
+    {
+      "id": "post_1789561623266_2e0da8d5",
+      "userId": "usr_1789561623258_0284b0a8",
+      "userName": "Runner Athlete",
+      "userAvatar": null,
+      "imageUrl": "/api/community/uploads/post_1789561623263_127e61a507fe.png",
+      "caption": "Crushed 50 pushups with perfect form! 💪🔥 #Milestone",
+      "createdAt": "2026-09-16T12:27:03.266Z",
+      "updatedAt": "2026-09-16T12:27:03.266Z",
+      "likesCount": 0,
+      "commentsCount": 0
+    },
+    {
+      "id": "post_1789560006773_a0888ba5",
+      "userId": "usr_1789560006762_0aef6bbb",
+      "userName": "Runner Athlete",
+      "userAvatar": null,
+      "imageUrl": "",
+      "caption": "Just completed 5k run in 22 minutes! Great progress this month 🏃💨",
+      "createdAt": "2026-09-16T12:00:06.773Z",
+      "updatedAt": "2026-09-16T12:00:06.773Z",
+      "likesCount": 0,
+      "commentsCount": 0
+    },
+    {
+      "id": "post_1789560006772_a1158e0c",
+      "userId": "usr_1789560006762_0aef6bbb",
+      "userName": "Runner Athlete",
+      "userAvatar": null,
+      "imageUrl": "/api/community/uploads/post_1789560006772_560fd97ae243.jpg",
+      "caption": "Morning calisthenics flow completed! ⚡🏃",
+      "createdAt": "2026-09-16T12:00:06.772Z",
+      "updatedAt": "2026-09-16T12:00:06.772Z",
+      "likesCount": 0,
+      "commentsCount": 0
+    },
+    {
+      "id": "post_1789560006770_b9967269",
+      "userId": "usr_1789560006762_0aef6bbb",
+      "userName": "Runner Athlete",
+      "userAvatar": null,
+      "imageUrl": "/api/community/uploads/post_1789560006767_d6d9f715fd22.png",
+      "caption": "Crushed 50 pushups with perfect form! 💪🔥 #Milestone",
+      "createdAt": "2026-09-16T12:00:06.770Z",
+      "updatedAt": "2026-09-16T12:00:06.770Z",
+      "likesCount": 0,
+      "commentsCount": 0
+    },
+    {
+      "id": "post_1789559123807_8f88b96a",
+      "userId": "usr_1789559123737_b4532678",
+      "userName": "Security Alice 1789559123657",
+      "userAvatar": null,
+      "imageUrl": "/api/community/uploads/post_1789559123805_65777e527eb9.png",
+      "caption": "Great workout! alert(\"xss\") Bold Progress #FitPilot",
+      "createdAt": "2026-09-16T11:45:23.807Z",
+      "updatedAt": "2026-09-16T11:45:23.815Z",
+      "likesCount": 1,
+      "commentsCount": 1
+    },
+    {
+      "id": "post_1789558878059_448936d7",
+      "userId": "usr_1789558877983_8c78c81a",
+      "userName": "Alice Athlete 1789558877919",
+      "userAvatar": null,
+      "imageUrl": "/api/community/uploads/post_1789558878049_b889a67bb1a2.png",
+      "caption": "Post to test reporting mechanism",
+      "createdAt": "2026-09-16T11:41:18.059Z",
+      "updatedAt": "2026-09-16T11:41:18.059Z",
+      "likesCount": 0,
+      "commentsCount": 0
+    },
+    {
+      "id": "post_1789558594943_06376e07",
+      "userId": "usr_1789558594868_e3db379b",
+      "userName": "Alice Athlete 1789558594804",
+      "userAvatar": null,
+      "imageUrl": "/api/community/uploads/post_1789558594935_ef8e2f6cfb7c.png",
+      "caption": "Post to test reporting mechanism",
+      "createdAt": "2026-09-16T11:36:34.944Z",
+      "updatedAt": "2026-09-16T11:36:34.944Z",
+      "likesCount": 0,
+      "commentsCount": 0
+    },
+    {
+      "id": "post_1789558236036_0aad93fb",
+      "userId": "usr_1789558235955_4fe812cc",
+      "userName": "Alice Athlete 1789558235885",
+      "userAvatar": null,
+      "imageUrl": "/api/community/uploads/post_1789558236024_6355c61aa3fe.png",
+      "caption": "Post to test reporting mechanism",
+      "createdAt": "2026-09-16T11:30:36.036Z",
+      "updatedAt": "2026-09-16T11:30:36.036Z",
+      "likesCount": 0,
+      "commentsCount": 0
+    }
+  ],
+  "likes": [
+    {
+      "id": "like_1789559123815_aecd2836",
+      "postId": "post_1789559123807_8f88b96a",
+      "userId": "usr_1789559123802_01db7569",
+      "createdAt": "2026-09-16T11:45:23.815Z"
+    },
+    {
+      "id": "like_1789561923736_ddb7d888",
+      "postId": "post_1789561911746_48400964",
+      "userId": "usr_1789561685532_7993df32",
+      "createdAt": "2026-09-16T12:32:03.736Z"
+    },
+    {
+      "id": "like_1789567950822_66c543c6",
+      "postId": "post_1789561911746_48400964",
+      "userId": "usr_1789023530588_c99bc24c",
+      "createdAt": "2026-09-16T14:12:30.822Z"
+    }
+  ],
+  "comments": [
+    {
+      "id": "cmt_1789559123808_d061d20e",
+      "postId": "post_1789559123807_8f88b96a",
+      "userId": "usr_1789559123802_01db7569",
+      "userName": "Security Bob 1789559123657",
+      "userAvatar": null,
+      "text": "Awesome!  Keep it up!",
+      "createdAt": "2026-09-16T11:45:23.808Z",
+      "updatedAt": "2026-09-16T11:45:23.808Z"
+    },
+    {
+      "id": "cmt_1789567979598_a58066dc",
+      "postId": "post_1789561911746_48400964",
+      "userId": "usr_1789023530588_c99bc24c",
+      "userName": "Nakul",
+      "userAvatar": "https://lh3.googleusercontent.com/a/default-user",
+      "text": "How much ?",
+      "createdAt": "2026-09-16T14:12:59.598Z",
+      "updatedAt": "2026-09-16T14:12:59.598Z"
+    }
+  ],
+  "reports": [
+    {
+      "id": "rep_1789558236036_20879b68",
+      "userId": "usr_1789558236021_21ddfeaf",
+      "postId": "post_1789558236036_0aad93fb",
+      "commentId": null,
+      "reason": "Inappropriate content testing reason",
+      "createdAt": "2026-09-16T11:30:36.036Z"
+    },
+    {
+      "id": "rep_1789558594944_20c5fa22",
+      "userId": "usr_1789558594934_b8a0ff3a",
+      "postId": "post_1789558594943_06376e07",
+      "commentId": null,
+      "reason": "Inappropriate content testing reason",
+      "createdAt": "2026-09-16T11:36:34.944Z"
+    },
+    {
+      "id": "rep_1789558878060_f9f3c3c3",
+      "userId": "usr_1789558878047_cc604a83",
+      "postId": "post_1789558878059_448936d7",
+      "commentId": null,
+      "reason": "Inappropriate content testing reason",
+      "createdAt": "2026-09-16T11:41:18.060Z"
+    }
+  ],
+  "updatedAt": "2026-09-16T14:12:59.598Z"
+}
