@@ -1,6 +1,54 @@
 {
   "posts": [
     {
+      "id": "post_1789648871783_60138145",
+      "userId": "usr_1789648871706_bcc8fb8e",
+      "userName": "Alice Athlete 1789648871642",
+      "userAvatar": null,
+      "imageUrl": "/api/community/uploads/post_1789648871774_fc481220b196.png",
+      "caption": "Post to test reporting mechanism",
+      "createdAt": "2026-09-17T12:41:11.783Z",
+      "updatedAt": "2026-09-17T12:41:11.783Z",
+      "likesCount": 0,
+      "commentsCount": 0
+    },
+    {
+      "id": "post_1789648520382_7c04941b",
+      "userId": "usr_1789648520300_69c2db78",
+      "userName": "Alice Athlete 1789648520229",
+      "userAvatar": null,
+      "imageUrl": "/api/community/uploads/post_1789648520368_2ee775a33581.png",
+      "caption": "Post to test reporting mechanism",
+      "createdAt": "2026-09-17T12:35:20.382Z",
+      "updatedAt": "2026-09-17T12:35:20.382Z",
+      "likesCount": 0,
+      "commentsCount": 0
+    },
+    {
+      "id": "post_1789641193378_580cfb86",
+      "userId": "usr_1789023530588_c99bc24c",
+      "userName": "Nakul",
+      "userAvatar": "https://lh3.googleusercontent.com/a/default-user",
+      "imageUrl": "/api/community/uploads/post_1789641192227_1df63aee8720.jpg",
+      "caption": "Alien",
+      "createdAt": "2026-09-17T10:33:13.378Z",
+      "updatedAt": "2026-09-17T10:33:13.378Z",
+      "likesCount": 0,
+      "commentsCount": 0
+    },
+    {
+      "id": "post_1789641162128_8ef2fa40",
+      "userId": "usr_1789023530588_c99bc24c",
+      "userName": "Nakul",
+      "userAvatar": "https://lh3.googleusercontent.com/a/default-user",
+      "imageUrl": "/api/community/uploads/post_1789641161163_1093c031687e.jpg",
+      "caption": "Gsushs",
+      "createdAt": "2026-09-17T10:32:42.128Z",
+      "updatedAt": "2026-09-17T10:32:42.128Z",
+      "likesCount": 0,
+      "commentsCount": 0
+    },
+    {
       "id": "post_1789561911746_48400964",
       "userId": "usr_1789561685532_7993df32",
       "userName": "Alex Rivera",
@@ -199,7 +247,23 @@
       "commentId": null,
       "reason": "Inappropriate content testing reason",
       "createdAt": "2026-09-16T11:41:18.060Z"
+    },
+    {
+      "id": "rep_1789648520383_8856f252",
+      "userId": "usr_1789648520366_1e3b1eee",
+      "postId": "post_1789648520382_7c04941b",
+      "commentId": null,
+      "reason": "Inappropriate content testing reason",
+      "createdAt": "2026-09-17T12:35:20.383Z"
+    },
+    {
+      "id": "rep_1789648871784_04402e3e",
+      "userId": "usr_1789648871773_eaa15220",
+      "postId": "post_1789648871783_60138145",
+      "commentId": null,
+      "reason": "Inappropriate content testing reason",
+      "createdAt": "2026-09-17T12:41:11.784Z"
     }
   ],
-  "updatedAt": "2026-09-16T14:12:59.598Z"
+  "updatedAt": "2026-09-17T12:41:11.784Z"
 }

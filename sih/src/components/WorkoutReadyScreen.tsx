@@ -18,6 +18,7 @@ interface WorkoutReadyScreenProps {
   difficulty?: string;
   targetReps?: number;
   onStartWorkout: () => void;
+  onViewDemo?: () => void;
   onChangeExercise: () => void;
   onBack?: () => void;
 }
@@ -29,6 +30,8 @@ const EXERCISE_PHOTOS: Record<string, string> = {
   bicepcurls: 'https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?auto=format&fit=crop&w=600&q=80',
   pullups: 'https://images.unsplash.com/photo-1598971639058-fab3c3109a00?auto=format&fit=crop&w=600&q=80',
   lunges: 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?auto=format&fit=crop&w=600&q=80',
+  jumpingjacks: 'https://images.unsplash.com/photo-1518611012118-696072aa579a?auto=format&fit=crop&w=600&q=80',
+  mountainclimbers: 'https://images.unsplash.com/photo-1434682881908-b43d0467b798?auto=format&fit=crop&w=600&q=80',
 };
 
 export const WorkoutReadyScreen: React.FC<WorkoutReadyScreenProps> = ({
@@ -37,6 +40,7 @@ export const WorkoutReadyScreen: React.FC<WorkoutReadyScreenProps> = ({
   difficulty = 'Intermediate',
   targetReps,
   onStartWorkout,
+  onViewDemo,
   onChangeExercise,
   onBack,
 }) => {
@@ -55,6 +59,15 @@ export const WorkoutReadyScreen: React.FC<WorkoutReadyScreenProps> = ({
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch {}
     onStartWorkout();
+  };
+
+  const handleDemoPress = () => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+    if (onViewDemo) {
+      onViewDemo();
+    }
   };
 
   const checklistItems = [
@@ -107,13 +120,24 @@ export const WorkoutReadyScreen: React.FC<WorkoutReadyScreenProps> = ({
             resizeMode="cover"
           />
           <View style={styles.bannerOverlay}>
-            <View>
+            <View style={{ flex: 1, justifyContent: 'flex-end' }}>
               <Text style={styles.bannerName}>{exerciseName}</Text>
               <Text style={styles.bannerCategory}>
                 {category} · {difficulty}
                 {targetReps ? ` · Target: ${targetReps} reps` : ''}
               </Text>
             </View>
+
+            {onViewDemo && (
+              <TouchableOpacity
+                style={styles.bannerDemoButton}
+                onPress={handleDemoPress}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="play" size={14} color="#FFFFFF" />
+                <Text style={styles.bannerDemoButtonText}>3D Demo</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
 
@@ -233,7 +257,26 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(28, 28, 26, 0.45)',
     padding: Theme.spacing.lg,
-    justifyContent: 'flex-end',
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+  },
+  bannerDemoButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Theme.colors.primaryGreen,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: Theme.borderRadius.full,
+    gap: 5,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    ...Theme.shadows.soft,
+  },
+  bannerDemoButtonText: {
+    color: '#FFFFFF',
+    fontSize: Theme.typography.sizes.xs,
+    fontWeight: '700',
   },
   bannerName: {
     fontSize: Theme.typography.sizes.xl,

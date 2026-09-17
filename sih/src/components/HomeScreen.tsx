@@ -20,6 +20,7 @@ interface HomeScreenProps {
   user?: User | null;
   onStartMainWorkout: () => void;
   onSelectQuickExercise: (exerciseName: string) => void;
+  onViewDemo?: (exerciseName: string) => void;
   onNavigateToWorkouts: () => void;
   onNavigateToProfile: () => void;
   onNavigateToFoodScanner?: () => void;
@@ -29,6 +30,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   user,
   onStartMainWorkout,
   onSelectQuickExercise,
+  onViewDemo,
   onNavigateToWorkouts,
   onNavigateToProfile,
   onNavigateToFoodScanner,
@@ -257,6 +259,22 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 style={styles.quickCardImage}
                 resizeMode="cover"
               />
+              {onViewDemo && (
+                <TouchableOpacity
+                  style={styles.quickDemoBadge}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    try {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    } catch {}
+                    onViewDemo(item.name);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="play" size={10} color="#FFFFFF" />
+                  <Text style={styles.quickDemoBadgeText}>3D Demo</Text>
+                </TouchableOpacity>
+              )}
               <View style={styles.quickCardContent}>
                 <Text style={styles.quickCardTitle}>{item.name}</Text>
                 <Text style={styles.quickCardSubtitle}>{item.subtitle}</Text>
@@ -436,6 +454,23 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 110,
     backgroundColor: Theme.colors.surfaceSecondary,
+  },
+  quickDemoBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(31, 107, 79, 0.9)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: Theme.borderRadius.full,
+  },
+  quickDemoBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '700',
   },
   quickCardContent: {
     padding: Theme.spacing.md,

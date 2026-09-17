@@ -14,6 +14,7 @@ import { BottomNavBar, MainTabType } from './src/components/BottomNavBar';
 import { DailyMoodCheckInScreen } from './src/components/DailyMoodCheckInScreen';
 import { TodaysWorkoutScreen } from './src/components/TodaysWorkoutScreen';
 import { WorkoutReadyScreen } from './src/components/WorkoutReadyScreen';
+import { ExerciseDemoScreen } from './src/components/ExerciseDemoScreen';
 import { WorkoutCameraScreen } from './src/components/WorkoutCameraScreen';
 import { FoodScannerScreen } from './src/components/FoodScannerScreen';
 import { UserProfileSetupScreen } from './src/components/UserProfileSetupScreen';
@@ -34,6 +35,7 @@ type AppView =
   | 'mood-checkin'
   | 'todays-workout'
   | 'workout-ready'
+  | 'exercise-demo'
   | 'workout-camera'
   | 'food-scanner'
   | 'profile-setup';
@@ -125,6 +127,16 @@ export default function App() {
     setCurrentView('mood-checkin');
   };
 
+  // Open 3D Exercise Demo modal/screen
+  const handleOpenExerciseDemo = (exerciseName: string, targetReps?: number) => {
+    setSelectedExercise(exerciseName);
+    if (targetReps) {
+      setSelectedTargetReps(targetReps);
+    }
+    setPreviousView(currentView);
+    setCurrentView('exercise-demo');
+  };
+
   // Quick Play directly navigates to Workout Ready screen
   const handleQuickLaunchExercise = (exerciseName: string, targetReps?: number) => {
     setSelectedExercise(exerciseName);
@@ -212,6 +224,7 @@ export default function App() {
                 user={currentUser}
                 onStartMainWorkout={() => handleStartDailyFlow()}
                 onSelectQuickExercise={handleQuickLaunchExercise}
+                onViewDemo={(exercise) => handleOpenExerciseDemo(exercise)}
                 onNavigateToWorkouts={() => setActiveTab('workout')}
                 onNavigateToProfile={() => setActiveTab('profile')}
                 onNavigateToFoodScanner={() => setCurrentView('food-scanner')}
@@ -225,6 +238,7 @@ export default function App() {
                   setSelectedExercise(exercise);
                   setCurrentView('workout-ready');
                 }}
+                onViewDemo={(exercise) => handleOpenExerciseDemo(exercise)}
                 onBack={() => setActiveTab('home')}
                 onOpenSettings={() => setActiveTab('profile')}
               />
@@ -301,6 +315,7 @@ export default function App() {
             checkInData={checkInData}
             generatedWorkout={generatedWorkout}
             onStartWorkout={handleStartFromWorkoutPlan}
+            onViewDemo={(exercise, reps) => handleOpenExerciseDemo(exercise, reps)}
             onEditCheckIn={handleEditCheckIn}
             onBack={() => handleReturnToTabs()}
           />
@@ -311,11 +326,27 @@ export default function App() {
             exerciseName={selectedExercise}
             targetReps={selectedTargetReps}
             onStartWorkout={handleLaunchCameraWorkout}
+            onViewDemo={() => handleOpenExerciseDemo(selectedExercise, selectedTargetReps)}
             onChangeExercise={() => {
               setActiveTab('workout');
               setCurrentView('tabs');
             }}
             onBack={() => handleReturnToTabs()}
+          />
+        )}
+
+        {currentView === 'exercise-demo' && (
+          <ExerciseDemoScreen
+            exerciseName={selectedExercise}
+            targetReps={selectedTargetReps}
+            onStartExercise={(name, reps) => {
+              setSelectedExercise(name);
+              if (reps) setSelectedTargetReps(reps);
+              setCurrentView('workout-ready');
+            }}
+            onBack={() => {
+              setCurrentView(previousView || 'tabs');
+            }}
           />
         )}
 

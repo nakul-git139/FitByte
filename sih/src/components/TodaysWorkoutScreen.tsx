@@ -18,6 +18,7 @@ interface TodaysWorkoutScreenProps {
   checkInData: MoodCheckInData | null;
   generatedWorkout?: GeneratedWorkout | null;
   onStartWorkout: (initialExercise?: string, targetReps?: number) => void;
+  onViewDemo?: (exerciseName: string, targetReps?: number) => void;
   onEditCheckIn: () => void;
   onBack?: () => void;
 }
@@ -37,6 +38,7 @@ export const TodaysWorkoutScreen: React.FC<TodaysWorkoutScreenProps> = ({
   checkInData,
   generatedWorkout,
   onStartWorkout,
+  onViewDemo,
   onEditCheckIn,
   onBack,
 }) => {
@@ -62,6 +64,15 @@ export const TodaysWorkoutScreen: React.FC<TodaysWorkoutScreenProps> = ({
     const chosenExercise = chosenObj?.name || 'Pushups';
     const chosenReps = chosenObj?.reps;
     onStartWorkout(chosenExercise, chosenReps);
+  };
+
+  const handleDemoPress = (exerciseName: string, targetReps?: number) => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+    if (onViewDemo) {
+      onViewDemo(exerciseName, targetReps);
+    }
   };
 
   const handleEdit = () => {
@@ -156,6 +167,16 @@ export const TodaysWorkoutScreen: React.FC<TodaysWorkoutScreenProps> = ({
                     <Text style={styles.exerciseName}>{item.name}</Text>
                     <Text style={styles.exerciseReps}>{repDisplay}</Text>
                   </View>
+
+                  {/* Minimal View Demo Action */}
+                  <TouchableOpacity
+                    style={styles.viewDemoButton}
+                    onPress={() => handleDemoPress(item.name, item.reps)}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="play-circle-outline" size={14} color={Theme.colors.primaryGreen} />
+                    <Text style={styles.viewDemoButtonText}>View Demo</Text>
+                  </TouchableOpacity>
 
                   {isSelected && (
                     <View style={styles.selectedBadge}>
@@ -346,6 +367,21 @@ const styles = StyleSheet.create({
     color: Theme.colors.textSecondary,
     marginTop: 2,
     fontWeight: '500',
+  },
+  viewDemoButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Theme.colors.lightGreen,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: Theme.borderRadius.md,
+    gap: 4,
+    marginRight: 6,
+  },
+  viewDemoButtonText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Theme.colors.primaryGreenDark,
   },
   selectedBadge: {
     width: 22,

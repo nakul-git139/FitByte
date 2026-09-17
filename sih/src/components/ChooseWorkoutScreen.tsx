@@ -15,6 +15,7 @@ import { Theme } from '../config/theme';
 interface ChooseWorkoutScreenProps {
   initialExercise?: string;
   onSelectExerciseAndContinue: (exerciseName: string) => void;
+  onViewDemo?: (exerciseName: string) => void;
   onBack?: () => void;
   onOpenSettings?: () => void;
 }
@@ -22,6 +23,7 @@ interface ChooseWorkoutScreenProps {
 export const ChooseWorkoutScreen: React.FC<ChooseWorkoutScreenProps> = ({
   initialExercise = 'Pushups',
   onSelectExerciseAndContinue,
+  onViewDemo,
   onBack,
   onOpenSettings,
 }) => {
@@ -70,6 +72,20 @@ export const ChooseWorkoutScreen: React.FC<ChooseWorkoutScreenProps> = ({
       difficulty: 'Advanced',
       imageUrl: 'https://images.unsplash.com/photo-1598971639058-fab3c3109a00?auto=format&fit=crop&w=400&q=80',
     },
+    {
+      id: 'Jumping Jacks',
+      name: 'Jumping Jacks',
+      category: 'Cardio & Agility',
+      difficulty: 'Beginner',
+      imageUrl: 'https://images.unsplash.com/photo-1518611012118-696072aa579a?auto=format&fit=crop&w=400&q=80',
+    },
+    {
+      id: 'Mountain Climbers',
+      name: 'Mountain Climbers',
+      category: 'Core & Conditioning',
+      difficulty: 'Intermediate',
+      imageUrl: 'https://images.unsplash.com/photo-1434682881908-b43d0467b798?auto=format&fit=crop&w=400&q=80',
+    },
   ];
 
   const handleSelectCard = (id: string) => {
@@ -78,6 +94,15 @@ export const ChooseWorkoutScreen: React.FC<ChooseWorkoutScreenProps> = ({
     } catch {}
     setSelectedExercise(id);
     onSelectExerciseAndContinue(id);
+  };
+
+  const handleDemoPress = (exerciseName: string) => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+    if (onViewDemo) {
+      onViewDemo(exerciseName);
+    }
   };
 
   return (
@@ -118,6 +143,19 @@ export const ChooseWorkoutScreen: React.FC<ChooseWorkoutScreenProps> = ({
                   <Text style={styles.cardCategory}>
                     {item.category} · {item.difficulty}
                   </Text>
+                  
+                  {/* Minimal View Demo Action */}
+                  <TouchableOpacity
+                    style={styles.viewDemoPill}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      handleDemoPress(item.name);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="play-circle-outline" size={13} color={Theme.colors.primaryGreen} />
+                    <Text style={styles.viewDemoPillText}>View Demo</Text>
+                  </TouchableOpacity>
                 </View>
 
                 <Image
@@ -219,6 +257,22 @@ const styles = StyleSheet.create({
     color: Theme.colors.textSecondary,
     marginTop: 4,
     fontWeight: '500',
+  },
+  viewDemoPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Theme.colors.lightGreen,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: Theme.borderRadius.md,
+    gap: 4,
+    marginTop: 6,
+  },
+  viewDemoPillText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Theme.colors.primaryGreenDark,
   },
   cardImage: {
     width: 60,
