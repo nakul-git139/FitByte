@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   Text,
@@ -14,10 +14,17 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import * as WebBrowser from 'expo-web-browser';
+import * as Google from 'expo-auth-session/providers/google';
+import * as AuthSession from 'expo-auth-session';
 import { AuthService } from '../services/authService';
 import { User } from '../types/auth';
 import { FitPilotLogo } from './FitPilotLogo';
 import { Theme } from '../config/theme';
+import { GOOGLE_AUTH_CONFIG, isGoogleAuthAvailable } from '../config/authConfig';
+
+// Initialize WebBrowser redirect listener for OAuth sessions
+WebBrowser.maybeCompleteAuthSession();
 
 interface AuthScreenProps {
   onAuthSuccess: (user: User) => void;
@@ -42,6 +49,70 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
   const [googleEmailInput, setGoogleEmailInput] = useState<string>('');
   const [googleNameInput, setGoogleNameInput] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Compute standard redirect URI for Google OAuth in Expo
+  const redirectUri = AuthSession.makeRedirectUri({
+    scheme: 'fitpilot',
+    path: 'oauthredirect',
+  });
+
+  // Initialize Google Auth Request hook
+  const [request, response, promptAsync] = Google.useAuthRequest({
+    clientId: GOOGLE_AUTH_CONFIG.webClientId,
+    webClientId: GOOGLE_AUTH_CONFIG.webClientId,
+    androidClientId: GOOGLE_AUTH_CONFIG.androidClientId || undefined,
+    iosClientId: GOOGLE_AUTH_CONFIG.iosClientId || undefined,
+    redirectUri,
+    scopes: GOOGLE_AUTH_CONFIG.scopes,
+  });
+
+  // Handle Google OAuth response
+  useEffect(() => {
+    if (response?.type === 'success') {
+      const { authentication } = response;
+      processGoogleAuthResponse(authentication);
+    } else if (response?.type === 'error') {
+      setErrorMessage(response.error?.message || 'Google sign-in was unsuccessful.');
+      setIsGoogleLoading(false);
+    } else if (response?.type === 'cancel' || response?.type === 'dismiss') {
+      setIsGoogleLoading(false);
+    }
+  }, [response]);
+
+  const processGoogleAuthResponse = async (authentication: any) => {
+    setIsGoogleLoading(true);
+    setErrorMessage(null);
+
+    try {
+      let userInfo: any = null;
+      if (authentication?.accessToken) {
+        try {
+          userInfo = await AuthService.fetchGoogleUserProfile(authentication.accessToken);
+        } catch (fetchErr: any) {
+          console.warn('[AuthScreen] Failed to fetch userinfo from Google token:', fetchErr.message);
+        }
+      }
+
+      const res = await AuthService.loginWithGoogle({
+        idToken: authentication?.idToken,
+        accessToken: authentication?.accessToken,
+        userInfo: userInfo || undefined,
+      });
+
+      setIsGoogleLoading(false);
+      if (res.success && res.user) {
+        try {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        } catch {}
+        onAuthSuccess(res.user);
+      } else {
+        setErrorMessage(res.error || 'Google Sign-In failed to authenticate with server');
+      }
+    } catch (err: any) {
+      setIsGoogleLoading(false);
+      setErrorMessage(err.message || 'An error occurred during Google Sign-In');
+    }
+  };
 
   const handleTabSwitch = (newMode: AuthMode) => {
     try {
@@ -142,10 +213,23 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
     }
   };
 
-  const handleGoogleSignIn = () => {
-    if (email.trim().length > 0 && email.includes('@')) {
-      executeGoogleAuth(email, name);
+  const handleGoogleSignIn = async () => {
+    setErrorMessage(null);
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } catch {}
+
+    if (isGoogleAuthAvailable() && promptAsync) {
+      setIsGoogleLoading(true);
+      try {
+        await promptAsync();
+      } catch (err: any) {
+        setIsGoogleLoading(false);
+        console.warn('[AuthScreen] promptAsync error, falling back to modal:', err.message);
+        setShowGoogleModal(true);
+      }
     } else {
+      // If client IDs are not configured yet, open quick test / credential guide modal
       setGoogleEmailInput(email.trim());
       setGoogleNameInput(name.trim());
       setShowGoogleModal(true);
@@ -197,7 +281,10 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
               activeOpacity={0.8}
             >
               {isGoogleLoading ? (
-                <ActivityIndicator size="small" color={Theme.colors.primaryGreen} />
+                <View style={styles.loadingRow}>
+                  <ActivityIndicator size="small" color="#EA4335" />
+                  <Text style={[styles.socialAuthButtonText, { marginLeft: 8 }]}>Connecting to Google...</Text>
+                </View>
               ) : (
                 <>
                   <Ionicons name="logo-google" size={18} color="#EA4335" style={{ marginRight: 10 }} />
@@ -352,7 +439,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Google Sign-In Input Modal */}
+      {/* Google Sign-In Input & Fast Test Modal */}
       <Modal
         visible={showGoogleModal}
         transparent={true}
@@ -366,7 +453,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
           <View style={styles.googleModalCard}>
             <View style={styles.googleModalHeader}>
               <Ionicons name="logo-google" size={24} color="#EA4335" />
-              <Text style={styles.googleModalTitle}>Sign in with Google</Text>
+              <Text style={styles.googleModalTitle}>Google Authentication</Text>
               <TouchableOpacity
                 onPress={() => setShowGoogleModal(false)}
                 style={styles.googleModalClose}
@@ -376,7 +463,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
             </View>
 
             <Text style={styles.googleModalSubtitle}>
-              Connect your Google account with FitPilot to personalize workouts and track progress.
+              FitPilot connects with Google OAuth to personalize your workout experience. You can sign in with your Google account below:
             </Text>
 
             {/* Quick 1-Tap Account Selector */}
@@ -397,7 +484,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
 
             <View style={styles.dividerRowSmall}>
               <View style={styles.dividerLine} />
-              <Text style={styles.dividerTextSmall}>OR ENTER ACCOUNT</Text>
+              <Text style={styles.dividerTextSmall}>OR ENTER ANY GOOGLE ACCOUNT</Text>
               <View style={styles.dividerLine} />
             </View>
 
@@ -407,7 +494,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                 <Ionicons name="person-outline" size={18} color={Theme.colors.textSecondary} style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
-                  placeholder="e.g. John Doe"
+                  placeholder="e.g. Alex Rivera"
                   placeholderTextColor={Theme.colors.textMuted}
                   value={googleNameInput}
                   onChangeText={setGoogleNameInput}
@@ -438,7 +525,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
               onPress={() => executeGoogleAuth(googleEmailInput || 'athlete@gmail.com', googleNameInput || 'Athlete')}
               activeOpacity={0.85}
             >
-              <Text style={styles.googleConfirmButtonText}>Continue with Google</Text>
+              <Text style={styles.googleConfirmButtonText}>Sign In with Google</Text>
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
@@ -510,6 +597,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Theme.colors.borderSubtle,
     ...Theme.shadows.soft,
+  },
+  loadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   socialAuthButtonText: {
     fontSize: Theme.typography.sizes.md,

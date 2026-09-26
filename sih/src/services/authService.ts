@@ -157,13 +157,41 @@ export class AuthService {
   }
 
   /**
+   * Fetch user profile from Google UserInfo endpoint using an access token
+   */
+  public static async fetchGoogleUserProfile(accessToken: string): Promise<{
+    id: string;
+    email: string;
+    name: string;
+    picture: string;
+  }> {
+    const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (!res.ok) {
+      throw new Error(`Failed to fetch Google profile (status ${res.status})`);
+    }
+
+    const data = await res.json();
+    return {
+      id: data.sub || data.id,
+      email: data.email,
+      name: data.name || data.given_name || (data.email ? data.email.split('@')[0] : 'Athlete'),
+      picture: data.picture || 'https://lh3.googleusercontent.com/a/default-user',
+    };
+  }
+
+  /**
    * Direct login or signup using Google credentials
    * Seamlessly logs in with Google online or offline with full profile hydration
    */
   public static async loginWithGoogle(payload: GoogleAuthPayload): Promise<AuthResponse> {
     const cleanEmail = (payload.userInfo?.email || 'google.athlete@gmail.com').trim().toLowerCase();
     const cleanName = payload.userInfo?.name || cleanEmail.split('@')[0] || 'Google Athlete';
-    const cleanAvatar = payload.userInfo?.picture || 'https://lh3.googleusercontent.com/a/default-user';
+    const cleanAvatar = payload.userInfo?.picture || payload.userInfo?.photo || 'https://lh3.googleusercontent.com/a/default-user';
     const googleId = payload.userInfo?.id || `google_${cleanEmail.replace(/[^a-zA-Z0-9]/g, '_')}`;
 
     try {
@@ -171,8 +199,17 @@ export class AuthService {
       const response = await fetchWithTimeout(`${baseUrl}/api/auth/google`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      }, 3500);
+        body: JSON.stringify({
+          idToken: payload.idToken,
+          accessToken: payload.accessToken,
+          userInfo: {
+            id: googleId,
+            email: cleanEmail,
+            name: cleanName,
+            picture: cleanAvatar,
+          },
+        }),
+      }, 4000);
 
       const data = await response.json();
       if (!response.ok || !data.success) {
