@@ -12,12 +12,15 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Theme } from '../config/theme';
 
+import { ExerciseWeightSelector } from './ExerciseWeightSelector';
+
 interface WorkoutReadyScreenProps {
   exerciseName: string;
   category?: string;
   difficulty?: string;
   targetReps?: number;
-  onStartWorkout: () => void;
+  initialWeightKg?: number;
+  onStartWorkout: (weightKg?: number) => void;
   onViewDemo?: () => void;
   onChangeExercise: () => void;
   onBack?: () => void;
@@ -39,11 +42,18 @@ export const WorkoutReadyScreen: React.FC<WorkoutReadyScreenProps> = ({
   category = 'Upper body',
   difficulty = 'Intermediate',
   targetReps,
+  initialWeightKg = 7.5,
   onStartWorkout,
   onViewDemo,
   onChangeExercise,
   onBack,
 }) => {
+  const isBicepCurl =
+    (exerciseName || '').toLowerCase().includes('bicep') ||
+    (exerciseName || '').toLowerCase().includes('curl');
+
+  const [weightKg, setWeightKg] = React.useState<number>(initialWeightKg);
+
   const getPhoto = (name: string) => {
     const norm = (name || '').toLowerCase().replace(/[^a-z]/g, '');
     for (const key of Object.keys(EXERCISE_PHOTOS)) {
@@ -58,7 +68,7 @@ export const WorkoutReadyScreen: React.FC<WorkoutReadyScreenProps> = ({
     try {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch {}
-    onStartWorkout();
+    onStartWorkout(isBicepCurl ? weightKg : undefined);
   };
 
   const handleDemoPress = () => {
@@ -125,6 +135,7 @@ export const WorkoutReadyScreen: React.FC<WorkoutReadyScreenProps> = ({
               <Text style={styles.bannerCategory}>
                 {category} · {difficulty}
                 {targetReps ? ` · Target: ${targetReps} reps` : ''}
+                {isBicepCurl ? ` · ${weightKg > 0 ? `${weightKg} kg / dumbbell` : 'Bodyweight'}` : ''}
               </Text>
             </View>
 
@@ -140,6 +151,16 @@ export const WorkoutReadyScreen: React.FC<WorkoutReadyScreenProps> = ({
             )}
           </View>
         </View>
+
+        {/* Bicep Curls Weight Selector */}
+        {isBicepCurl && (
+          <ExerciseWeightSelector
+            weightKg={weightKg}
+            onChangeWeightKg={(w) => setWeightKg(w)}
+            title="Dumbbell Weight"
+            subtitle="Choose starting weight per dumbbell"
+          />
+        )}
 
         {/* Preparation Checklist */}
         <View style={styles.checklistCard}>

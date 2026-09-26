@@ -6,11 +6,13 @@ import {
   TouchableOpacity,
   Animated,
   TouchableWithoutFeedback,
+  Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { CameraFacing, WorkoutStatus, WorkoutStats } from '../types/workout';
 import { ExercisePhase, FormError, VisibilityStatus } from '../engine/types';
 import { Theme } from '../config/theme';
+import { ExerciseWeightSelector } from './ExerciseWeightSelector';
 
 interface WorkoutHUDOverlayProps {
   status: WorkoutStatus;
@@ -20,6 +22,8 @@ interface WorkoutHUDOverlayProps {
   selectedExercise: string;
   showPoseSkeleton: boolean;
   targetReps?: number;
+  weightKg?: number;
+  onUpdateWeight?: (newWeightKg: number) => void;
   currentSet?: number;
   totalSets?: number;
   isResting?: boolean;
@@ -56,6 +60,8 @@ export const WorkoutHUDOverlay: React.FC<WorkoutHUDOverlayProps> = ({
   selectedExercise,
   showPoseSkeleton,
   targetReps,
+  weightKg,
+  onUpdateWeight,
   currentSet = 1,
   totalSets = 3,
   isResting = false,
@@ -80,6 +86,12 @@ export const WorkoutHUDOverlay: React.FC<WorkoutHUDOverlayProps> = ({
   onExit,
 }) => {
   const isWorkoutActive = status === 'active' || status === 'paused';
+  const isBicepCurl =
+    (selectedExercise || '').toLowerCase().includes('bicep') ||
+    (selectedExercise || '').toLowerCase().includes('curl');
+
+  // Weight Adjustment Modal state
+  const [showWeightModal, setShowWeightModal] = useState<boolean>(false);
 
   // 1. Collapsible HUD State (Expand / Minimize)
   const [isHudMinimized, setIsHudMinimized] = useState<boolean>(false);
@@ -197,22 +209,40 @@ export const WorkoutHUDOverlay: React.FC<WorkoutHUDOverlayProps> = ({
             </TouchableOpacity>
           )}
 
-          {/* Center: Exercise Title Pill */}
-          <TouchableOpacity
-            style={styles.exerciseSelectorPill}
-            onPress={status === 'idle' ? onSelectExercise : undefined}
-            activeOpacity={status === 'idle' ? 0.8 : 1}
-          >
-            <Ionicons
-              name={selectedExercise === 'Pushups' ? 'barbell' : 'body'}
-              size={16}
-              color={Theme.colors.primaryGreen}
-            />
-            <Text style={styles.exerciseSelectorText}>{selectedExercise}</Text>
-            {status === 'idle' && (
-              <Ionicons name="chevron-down" size={14} color="#94A3B8" />
+          {/* Center: Exercise Title Pill & Dumbbell Weight Badge */}
+          <View style={styles.centerPillsRow}>
+            <TouchableOpacity
+              style={styles.exerciseSelectorPill}
+              onPress={status === 'idle' ? onSelectExercise : undefined}
+              activeOpacity={status === 'idle' ? 0.8 : 1}
+            >
+              <Ionicons
+                name={selectedExercise === 'Pushups' || isBicepCurl ? 'barbell' : 'body'}
+                size={16}
+                color={Theme.colors.primaryGreen}
+              />
+              <Text style={styles.exerciseSelectorText}>{selectedExercise}</Text>
+              {status === 'idle' && (
+                <Ionicons name="chevron-down" size={14} color="#94A3B8" />
+              )}
+            </TouchableOpacity>
+
+            {/* Bicep Curls Dumbbell Weight Badge & Quick Adjuster */}
+            {isBicepCurl && (
+              <TouchableOpacity
+                style={styles.weightHudPill}
+                onPress={() => setShowWeightModal(true)}
+                activeOpacity={0.8}
+                accessibilityLabel="Adjust Dumbbell Weight"
+              >
+                <Ionicons name="barbell-outline" size={14} color="#38BDF8" />
+                <Text style={styles.weightHudText}>
+                  {weightKg && weightKg > 0 ? `${weightKg} kg` : 'Bodyweight'}
+                </Text>
+                <Ionicons name="pencil" size={10} color="rgba(255,255,255,0.7)" />
+              </TouchableOpacity>
             )}
-          </TouchableOpacity>
+          </View>
 
           {/* Right Action Icons Group */}
           <View style={styles.topRightActions}>
@@ -540,6 +570,21 @@ export const WorkoutHUDOverlay: React.FC<WorkoutHUDOverlayProps> = ({
                 <Text style={styles.restCountdownUnit}>SECONDS</Text>
               </View>
 
+              {/* Bicep Curls Weight Adjust during Rest */}
+              {isBicepCurl && (
+                <TouchableOpacity
+                  style={styles.restWeightAdjustBtn}
+                  onPress={() => setShowWeightModal(true)}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="barbell-outline" size={15} color="#38BDF8" />
+                  <Text style={styles.restWeightAdjustText}>
+                    Dumbbells: {weightKg && weightKg > 0 ? `${weightKg} kg / arm` : 'Bodyweight'}
+                  </Text>
+                  <Text style={styles.restWeightAdjustAction}>Change</Text>
+                </TouchableOpacity>
+              )}
+
               {/* Skip Rest CTA */}
               {onSkipRest && (
                 <TouchableOpacity
@@ -556,6 +601,51 @@ export const WorkoutHUDOverlay: React.FC<WorkoutHUDOverlayProps> = ({
             </View>
           </View>
         )}
+
+        {/* Quick Weight Adjust Modal */}
+        <Modal
+          visible={showWeightModal}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowWeightModal(false)}
+        >
+          <View style={styles.modalBackdrop}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeaderRow}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Ionicons name="barbell" size={20} color={Theme.colors.primaryGreen} />
+                  <Text style={styles.modalTitle}>Adjust Dumbbell Weight</Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.modalCloseBtn}
+                  onPress={() => setShowWeightModal(false)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="close" size={20} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
+
+              <ExerciseWeightSelector
+                weightKg={weightKg || 7.5}
+                onChangeWeightKg={(w) => {
+                  if (onUpdateWeight) {
+                    onUpdateWeight(w);
+                  }
+                }}
+                title="Dumbbell Load"
+                subtitle="Weight per arm for bicep curls"
+              />
+
+              <TouchableOpacity
+                style={styles.modalConfirmBtn}
+                onPress={() => setShowWeightModal(false)}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.modalConfirmText}>Confirm & Apply</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
       </View>
     </TouchableWithoutFeedback>
   );
@@ -601,6 +691,11 @@ const styles = StyleSheet.create({
   skeletonActiveButton: {
     borderColor: Theme.colors.primaryGreen,
   },
+  centerPillsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   exerciseSelectorPill: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -611,6 +706,22 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  weightHudPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(15, 23, 42, 0.85)',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(56, 189, 248, 0.4)',
+  },
+  weightHudText: {
+    color: '#38BDF8',
+    fontSize: 12,
+    fontWeight: '700',
   },
   exerciseSelectorText: {
     color: '#FFFFFF',
@@ -976,6 +1087,29 @@ const styles = StyleSheet.create({
     color: '#F59E0B',
     letterSpacing: 0.5,
   },
+  restWeightAdjustBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(15, 23, 42, 0.75)',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: Theme.borderRadius.full,
+    borderWidth: 1,
+    borderColor: 'rgba(56, 189, 248, 0.4)',
+    marginBottom: Theme.spacing.md,
+    gap: 6,
+  },
+  restWeightAdjustText: {
+    color: '#FFFFFF',
+    fontSize: Theme.typography.sizes.xs,
+    fontWeight: '600',
+  },
+  restWeightAdjustAction: {
+    color: '#38BDF8',
+    fontSize: Theme.typography.sizes.xs,
+    fontWeight: '700',
+    marginLeft: 4,
+  },
   startNextSetButton: {
     backgroundColor: Theme.colors.primaryGreen,
     flexDirection: 'row',
@@ -989,6 +1123,52 @@ const styles = StyleSheet.create({
   startNextSetButtonText: {
     color: '#FFFFFF',
     fontSize: Theme.typography.sizes.sm,
+    fontWeight: '700',
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Theme.spacing.lg,
+  },
+  modalContent: {
+    width: '100%',
+    backgroundColor: Theme.colors.surface,
+    borderRadius: Theme.borderRadius.xl,
+    padding: Theme.spacing.base,
+    ...Theme.shadows.card,
+  },
+  modalHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: Theme.spacing.sm,
+  },
+  modalTitle: {
+    fontSize: Theme.typography.sizes.md,
+    fontWeight: '800',
+    color: Theme.colors.textPrimary,
+  },
+  modalCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: Theme.colors.surfaceSecondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalConfirmBtn: {
+    backgroundColor: Theme.colors.primaryGreen,
+    paddingVertical: Theme.spacing.md,
+    borderRadius: Theme.borderRadius.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: Theme.spacing.xs,
+  },
+  modalConfirmText: {
+    color: '#FFFFFF',
+    fontSize: Theme.typography.sizes.base,
     fontWeight: '700',
   },
 });

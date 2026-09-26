@@ -35,6 +35,7 @@ const EXERCISE_OPTIONS = [
 interface WorkoutCameraScreenProps {
   initialExercise?: string;
   initialTargetReps?: number;
+  initialWeightKg?: number;
   initialWorkoutPlan?: GeneratedWorkout | null;
   checkInData?: MoodCheckInData | null;
   onExit?: () => void;
@@ -43,6 +44,7 @@ interface WorkoutCameraScreenProps {
 export const WorkoutCameraScreen: React.FC<WorkoutCameraScreenProps> = ({
   initialExercise,
   initialTargetReps,
+  initialWeightKg = 7.5,
   initialWorkoutPlan,
   checkInData,
   onExit,
@@ -51,6 +53,7 @@ export const WorkoutCameraScreen: React.FC<WorkoutCameraScreenProps> = ({
   const [facing, setFacing] = useState<CameraFacing>('front');
   const [showPoseSkeleton, setShowPoseSkeleton] = useState<boolean>(true);
   const [isMuted, setIsMuted] = useState<boolean>(false);
+  const [selectedWeightKg, setSelectedWeightKg] = useState<number>(initialWeightKg);
 
   // Helper to dynamically extract target reps from the mood-generated AI plan
   const getDynamicTargetReps = (exerciseName: string): number => {
@@ -220,8 +223,16 @@ export const WorkoutCameraScreen: React.FC<WorkoutCameraScreenProps> = ({
           const nextDuration = prevStats.durationSeconds + 1;
           const nextActive = prevStats.activeSeconds + 1;
 
-          // METs calorie calculation
-          const repKcal = prevStats.repCount * (selectedExercise === 'Pushups' || selectedExercise === 'Pullups' ? 0.48 : 0.40);
+          // METs calorie calculation factoring in dumbbell weight for bicep curls
+          const isBicep = selectedExercise.toLowerCase().includes('bicep') || selectedExercise.toLowerCase().includes('curl');
+          const repMultiplier =
+            selectedExercise === 'Pushups' || selectedExercise === 'Pullups'
+              ? 0.48
+              : isBicep
+              ? 0.35 + (selectedWeightKg * 0.025)
+              : 0.40;
+
+          const repKcal = prevStats.repCount * repMultiplier;
           const activeKcal = (nextActive / 60) * 4.2;
           const totalCalories = Math.round(repKcal + activeKcal);
 
@@ -245,7 +256,7 @@ export const WorkoutCameraScreen: React.FC<WorkoutCameraScreenProps> = ({
         clearInterval(timerRef.current);
       }
     };
-  }, [workoutStatus, selectedExercise]);
+  }, [workoutStatus, selectedExercise, selectedWeightKg]);
 
   // Clean up rest interval on unmount
   useEffect(() => {
@@ -635,9 +646,25 @@ export const WorkoutCameraScreen: React.FC<WorkoutCameraScreenProps> = ({
       ? Math.round(allSets.reduce((sum, s) => sum + s.formScore, 0) / allSets.length)
       : stats.formAccuracyScore;
 
-    const repKcal = totalReps * (selectedExercise === 'Pushups' || selectedExercise === 'Pullups' ? 0.48 : 0.40);
+    const isBicep = selectedExercise.toLowerCase().includes('bicep') || selectedExercise.toLowerCase().includes('curl');
+    const bicepWeight = isBicep ? (selectedWeightKg || 7.5) : 0;
+    const repMultiplier =
+      selectedExercise === 'Pushups' || selectedExercise === 'Pullups'
+        ? 0.48
+        : isBicep
+        ? 0.35 + (bicepWeight * 0.025)
+        : 0.40;
+
+    const repKcal = totalReps * repMultiplier;
     const activeKcal = (stats.activeSeconds / 60) * 4.2;
     const totalCalories = Math.max(stats.caloriesBurned, Math.round(repKcal + activeKcal));
+
+    if (isBicep && bicepWeight > 0) {
+      const weightNote = `Used ${bicepWeight} kg dumbbells per arm for bicep curls`;
+      if (!geminiObservationsRef.current.includes(weightNote)) {
+        geminiObservationsRef.current.push(weightNote);
+      }
+    }
 
     const goodReps = totalPerfect;
     const badReps = Math.max(0, totalReps - totalPerfect);
@@ -952,6 +979,8 @@ export const WorkoutCameraScreen: React.FC<WorkoutCameraScreenProps> = ({
         isResting={isResting}
         restSecondsRemaining={restSecondsRemaining}
         onSkipRest={handleStartNextSet}
+        weightKg={selectedExercise.toLowerCase().includes('bicep') || selectedExercise.toLowerCase().includes('curl') ? selectedWeightKg : undefined}
+        onUpdateWeight={selectedExercise.toLowerCase().includes('bicep') || selectedExercise.toLowerCase().includes('curl') ? (w) => setSelectedWeightKg(w) : undefined}
         phase={currentPhase}
         kneeAngle={liveKneeAngle}
         elbowAngle={liveElbowAngle}

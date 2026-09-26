@@ -172,8 +172,13 @@ export default function App() {
     setCurrentView('workout-ready');
   };
 
+  const [selectedExerciseWeightKg, setSelectedExerciseWeightKg] = useState<number | undefined>(undefined);
+
   // Start workout from Workout Ready -> Launches camera
-  const handleLaunchCameraWorkout = () => {
+  const handleLaunchCameraWorkout = (weightKg?: number) => {
+    if (weightKg !== undefined) {
+      setSelectedExerciseWeightKg(weightKg);
+    }
     setCurrentView('workout-camera');
   };
 
@@ -325,7 +330,8 @@ export default function App() {
           <WorkoutReadyScreen
             exerciseName={selectedExercise}
             targetReps={selectedTargetReps}
-            onStartWorkout={handleLaunchCameraWorkout}
+            initialWeightKg={selectedExerciseWeightKg}
+            onStartWorkout={(weightKg) => handleLaunchCameraWorkout(weightKg)}
             onViewDemo={() => handleOpenExerciseDemo(selectedExercise, selectedTargetReps)}
             onChangeExercise={() => {
               setActiveTab('workout');
@@ -354,6 +360,7 @@ export default function App() {
           <WorkoutCameraScreen
             initialExercise={selectedExercise}
             initialTargetReps={selectedTargetReps}
+            initialWeightKg={selectedExerciseWeightKg}
             initialWorkoutPlan={generatedWorkout}
             checkInData={checkInData}
             onExit={handleExitWorkoutCamera}
