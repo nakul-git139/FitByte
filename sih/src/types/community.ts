@@ -1,3 +1,15 @@
+export interface PostProgressMetrics {
+  type: 'streak' | 'workout' | 'general';
+  streakDays?: number;
+  workoutsCount?: number;
+  totalReps?: number;
+  caloriesBurned?: number;
+  formAccuracy?: number;
+  exerciseName?: string;
+  chartData?: Array<{ day: string; value: number; score: number }>;
+  weeklyActiveDays?: boolean[]; // [M, T, W, T, F, S, S]
+}
+
 export interface CommunityPost {
   id: string;
   userId: string;
@@ -10,6 +22,7 @@ export interface CommunityPost {
   likesCount: number;
   commentsCount: number;
   isLikedByMe?: boolean;
+  progressMetrics?: PostProgressMetrics;
 }
 
 export interface CommunityLike {
@@ -62,6 +75,7 @@ export interface CreatePostPayload {
   caption: string;
   imageUrl?: string;
   imageBase64?: string;
+  progressMetrics?: PostProgressMetrics;
 }
 
 export interface AddCommentPayload {

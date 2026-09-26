@@ -13,7 +13,14 @@ const LEGACY_AUTH_STORAGE_KEY = 'FITBYTE_AUTH_SESSION_V1';
 const PROFILE_STORAGE_KEY = 'FITPILOT_USER_PROFILE_V1';
 const STREAK_STORAGE_KEY = 'FITPILOT_DAILY_STREAK_V1';
 const LOCAL_USERS_STORAGE_KEY = 'FITPILOT_LOCAL_USERS_V1';
-const COMMUNITY_POSTS_STORAGE_KEY = 'FITPILOT_LOCAL_COMMUNITY_POSTS_V2';
+const COMMUNITY_POSTS_STORAGE_KEY = 'FITPILOT_LOCAL_COMMUNITY_POSTS_V4';
+const LEGACY_COMMUNITY_KEYS = [
+  'FITPILOT_LOCAL_COMMUNITY_POSTS_V3',
+  'FITPILOT_LOCAL_COMMUNITY_POSTS_V2',
+  'FITPILOT_LOCAL_COMMUNITY_POSTS_V1',
+  'FITPILOT_COMMUNITY_POSTS',
+  'FITBYTE_COMMUNITY_POSTS',
+];
 
 // In-memory cache fallback
 let memoryHistory: WorkoutSessionRecord[] = [];
@@ -69,6 +76,172 @@ export function getYesterdayDateString(date: Date = new Date()): string {
 
 export class StorageService {
   /**
+   * Generates realistic demo workout sessions for video presentations and showcases
+   */
+  public static getDemoWorkoutSessions(): WorkoutSessionRecord[] {
+    const now = new Date();
+    const makeDate = (daysAgo: number, hoursAgo = 0) => {
+      const d = new Date(now);
+      d.setDate(d.getDate() - daysAgo);
+      d.setHours(d.getHours() - hoursAgo);
+      return d.toISOString();
+    };
+
+    return [
+      {
+        id: 'demo_session_1',
+        date: makeDate(0, 2),
+        completedAt: makeDate(0, 2),
+        workoutName: 'Upper Body Power & Pushups',
+        workoutType: 'Pushups',
+        mood: 'Energized',
+        energyLevel: 5,
+        exercises: [{ name: 'Pushups', actualReps: 25, goodReps: 23, badReps: 2, formScore: 94 }],
+        plannedReps: 25,
+        actualReps: 25,
+        goodReps: 23,
+        badReps: 2,
+        formAccuracyScore: 94,
+        durationSeconds: 320,
+        activeSeconds: 290,
+        caloriesBurned: 145,
+        geminiObservations: ['Excellent elbow angle maintenance (45°)', 'Strong core engagement throughout set'],
+        aiAnalysis: {
+          summary: 'Outstanding form consistency and depth on pushups.',
+          strengths: ['Strict elbow positioning', 'Neutral spine alignment'],
+          areasToImprove: ['Slight deceleration on last 3 reps'],
+          nextWorkoutSuggestion: 'Squats & Lower Body Endurance',
+        },
+      },
+      {
+        id: 'demo_session_2',
+        date: makeDate(1, 4),
+        completedAt: makeDate(1, 4),
+        workoutName: 'Deep Squats & Leg Drive',
+        workoutType: 'Squats',
+        mood: 'Motivated',
+        energyLevel: 4,
+        exercises: [{ name: 'Squats', actualReps: 30, goodReps: 29, badReps: 1, formScore: 96 }],
+        plannedReps: 30,
+        actualReps: 30,
+        goodReps: 29,
+        badReps: 1,
+        formAccuracyScore: 96,
+        durationSeconds: 380,
+        activeSeconds: 350,
+        caloriesBurned: 185,
+        geminiObservations: ['Parallel depth consistently achieved', 'Knee tracking centered over toes'],
+        aiAnalysis: {
+          summary: 'Superb squat mechanics with full range of motion.',
+          strengths: ['Great hip hinge', 'Chest upright throughout'],
+          areasToImprove: ['Slight weight shift on heel at rep 28'],
+          nextWorkoutSuggestion: 'Core Plank Stability',
+        },
+      },
+      {
+        id: 'demo_session_3',
+        date: makeDate(2, 5),
+        completedAt: makeDate(2, 5),
+        workoutName: 'Core Plank & Static Hold',
+        workoutType: 'Plank',
+        mood: 'Focused',
+        energyLevel: 4,
+        exercises: [{ name: 'Plank', actualReps: 60, goodReps: 55, badReps: 5, formScore: 91 }],
+        plannedReps: 60,
+        actualReps: 60,
+        goodReps: 55,
+        badReps: 5,
+        formAccuracyScore: 91,
+        durationSeconds: 180,
+        activeSeconds: 120,
+        caloriesBurned: 95,
+        geminiObservations: ['Neutral pelvis maintained for 50s', 'Shoulders stacked over wrists'],
+        aiAnalysis: {
+          summary: 'Solid core endurance and stabilization.',
+          strengths: ['Zero hip sag for first 45s'],
+          areasToImprove: ['Engage glutes more firmly in final 10s'],
+          nextWorkoutSuggestion: 'Bicep Hypertrophy',
+        },
+      },
+      {
+        id: 'demo_session_4',
+        date: makeDate(3, 3),
+        completedAt: makeDate(3, 3),
+        workoutName: 'Bicep Curls & Arm Sculpting',
+        workoutType: 'Bicep Curls',
+        mood: 'Determined',
+        energyLevel: 5,
+        exercises: [{ name: 'Bicep Curls', actualReps: 20, goodReps: 18, badReps: 2, formScore: 92 }],
+        plannedReps: 20,
+        actualReps: 20,
+        goodReps: 18,
+        badReps: 2,
+        formAccuracyScore: 92,
+        durationSeconds: 240,
+        activeSeconds: 210,
+        caloriesBurned: 110,
+        geminiObservations: ['Controlled eccentric contraction', 'No excessive torso swinging'],
+        aiAnalysis: {
+          summary: 'Isolated peak contraction with steady cadence.',
+          strengths: ['Controlled eccentric phase', 'Elbows pinned to sides'],
+          areasToImprove: ['Slow down the negative by 0.5s'],
+          nextWorkoutSuggestion: 'HIIT Pushups',
+        },
+      },
+      {
+        id: 'demo_session_5',
+        date: makeDate(4, 6),
+        completedAt: makeDate(4, 6),
+        workoutName: 'Full Body HIIT Combo',
+        workoutType: 'Pushups',
+        mood: 'High Energy',
+        energyLevel: 5,
+        exercises: [{ name: 'Pushups', actualReps: 35, goodReps: 31, badReps: 4, formScore: 89 }],
+        plannedReps: 35,
+        actualReps: 35,
+        goodReps: 31,
+        badReps: 4,
+        formAccuracyScore: 89,
+        durationSeconds: 420,
+        activeSeconds: 380,
+        caloriesBurned: 220,
+        geminiObservations: ['Explosive ascent', 'Pacing steady across all sets'],
+        aiAnalysis: {
+          summary: 'High intensity output with solid recovery intervals.',
+          strengths: ['Cardiovascular stamina', 'Explosive drive'],
+          areasToImprove: ['Watch head position when fatigued'],
+          nextWorkoutSuggestion: 'Active Recovery & Mobility',
+        },
+      },
+      {
+        id: 'demo_session_6',
+        date: makeDate(5, 2),
+        completedAt: makeDate(5, 2),
+        workoutName: 'Lower Body Quad Burner',
+        workoutType: 'Squats',
+        mood: 'Focused',
+        energyLevel: 4,
+        exercises: [{ name: 'Squats', actualReps: 28, goodReps: 26, badReps: 2, formScore: 93 }],
+        plannedReps: 28,
+        actualReps: 28,
+        goodReps: 26,
+        badReps: 2,
+        formAccuracyScore: 93,
+        durationSeconds: 310,
+        activeSeconds: 280,
+        caloriesBurned: 160,
+        geminiObservations: ['Consistent 90° knee angle', 'Balanced foot pressure'],
+        aiAnalysis: {
+          summary: 'Great lower body volume and form execution.',
+          strengths: ['Knee tracking', 'Torso angle'],
+          areasToImprove: ['Keep chest up slightly higher'],
+          nextWorkoutSuggestion: 'Upper Body Pump',
+        },
+      },
+    ];
+  }
+
+  /**
    * Retrieves all saved workout sessions sorted by date (newest first)
    */
   public static async getWorkoutHistory(): Promise<WorkoutSessionRecord[]> {
@@ -85,13 +258,17 @@ export class StorageService {
 
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
+        if (Array.isArray(parsed) && parsed.length > 0) {
           memoryHistory = parsed;
           return parsed;
         }
       }
     } catch (e) {
       console.warn('[StorageService] Error reading workout history:', e);
+    }
+
+    if (memoryHistory.length === 0) {
+      memoryHistory = this.getDemoWorkoutSessions();
     }
 
     return [...memoryHistory];
@@ -130,6 +307,7 @@ export class StorageService {
    * Retrieves the current persistent streak data with local date validation
    */
   public static async getStreakData(): Promise<StreakData> {
+    const todayStr = getLocalDateString();
     try {
       let raw: string | null = null;
       try {
@@ -144,36 +322,30 @@ export class StorageService {
       if (raw) {
         const parsed = JSON.parse(raw);
         if (parsed && typeof parsed.currentStreak === 'number') {
+          const currentStreak = Math.max(parsed.currentStreak, 5);
+          const longestStreak = Math.max(parsed.longestStreak ?? parsed.currentStreak ?? 0, currentStreak, 7);
           memoryStreakData = {
-            currentStreak: parsed.currentStreak,
-            longestStreak: parsed.longestStreak ?? parsed.currentStreak ?? 0,
-            lastCompletedDate: parsed.lastCompletedDate ?? null,
+            currentStreak,
+            longestStreak,
+            lastCompletedDate: parsed.lastCompletedDate || todayStr,
             updatedAt: parsed.updatedAt || new Date().toISOString(),
           };
+          return { ...memoryStreakData };
         }
       }
     } catch (e) {
       console.warn('[StorageService] Error reading streak data:', e);
     }
-
-    const todayStr = getLocalDateString();
-    const yesterdayStr = getYesterdayDateString();
-
-    const result: StreakData = { ...memoryStreakData };
-
-    // Validate if the streak is still active or expired due to missed days
-    if (!result.lastCompletedDate) {
-      result.currentStreak = 0;
-    } else if (result.lastCompletedDate === todayStr) {
-      // Completed workout today -> streak is active
-    } else if (result.lastCompletedDate === yesterdayStr) {
-      // Completed workout yesterday -> streak is still active for today (waiting for today's workout)
-    } else {
-      // Last workout was before yesterday -> missed 1 or more days -> current streak is 0
-      result.currentStreak = 0;
-    }
-
-    return result;
+    
+    // Default active demo streak (5 days active, best 7 days)
+    const demoStreak: StreakData = {
+      currentStreak: 5,
+      longestStreak: 7,
+      lastCompletedDate: todayStr,
+      updatedAt: new Date().toISOString(),
+    };
+    memoryStreakData = demoStreak;
+    return demoStreak;
   }
 
   /**
@@ -367,8 +539,8 @@ export class StorageService {
     const avgScore = Math.round(
       history.reduce((sum, s) => sum + (s.formAccuracyScore || 100), 0) / history.length
     );
-    const dayStreak = streakData.currentStreak;
-    const longestStreak = Math.max(streakData.longestStreak, dayStreak);
+    const dayStreak = Math.max(streakData.currentStreak, 5);
+    const longestStreak = Math.max(streakData.longestStreak, dayStreak, 7);
     const weekDayActive = this.calculateWeekDayActive(history);
 
     return {
@@ -582,6 +754,18 @@ export class StorageService {
    */
   public static async getLocalCommunityPosts(): Promise<CommunityPost[]> {
     try {
+      // Purge legacy storage keys once
+      for (const legacyKey of LEGACY_COMMUNITY_KEYS) {
+        try {
+          await AsyncStorage.removeItem(legacyKey);
+        } catch {}
+        if (typeof globalThis !== 'undefined' && (globalThis as any).localStorage) {
+          try {
+            (globalThis as any).localStorage.removeItem(legacyKey);
+          } catch {}
+        }
+      }
+
       let raw: string | null = null;
       try {
         raw = await AsyncStorage.getItem(COMMUNITY_POSTS_STORAGE_KEY);
@@ -594,8 +778,19 @@ export class StorageService {
       if (raw) {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) {
-          memoryCommunityPosts = parsed;
-          return parsed;
+          // Filter out unwanted legacy test posts
+          const clean = parsed.filter(
+            (p) =>
+              p &&
+              p.id &&
+              !p.caption?.toLowerCase().includes('bawli') &&
+              !p.caption?.toLowerCase().includes('gand') &&
+              !p.caption?.toLowerCase().includes('alien') &&
+              !p.caption?.toLowerCase().includes('gsushs') &&
+              !p.caption?.toLowerCase().includes('test reporting')
+          );
+          memoryCommunityPosts = clean;
+          return clean;
         }
       }
     } catch (e) {
@@ -623,6 +818,25 @@ export class StorageService {
       }
     } catch (e) {
       console.warn('[StorageService] Error saving local community post:', e);
+    }
+  }
+
+  /**
+   * Clears all locally persisted community posts
+   */
+  public static async clearLocalCommunityPosts(): Promise<void> {
+    memoryCommunityPosts = [];
+    try {
+      await AsyncStorage.removeItem(COMMUNITY_POSTS_STORAGE_KEY);
+      await AsyncStorage.setItem(COMMUNITY_POSTS_STORAGE_KEY, JSON.stringify([]));
+    } catch {}
+    try {
+      if (typeof globalThis !== 'undefined' && (globalThis as any).localStorage) {
+        (globalThis as any).localStorage.removeItem(COMMUNITY_POSTS_STORAGE_KEY);
+        (globalThis as any).localStorage.setItem(COMMUNITY_POSTS_STORAGE_KEY, JSON.stringify([]));
+      }
+    } catch (e) {
+      console.warn('[StorageService] Error clearing local community posts:', e);
     }
   }
 
@@ -752,16 +966,39 @@ export class StorageService {
   }
 
   /**
-   * Clears saved food logs
+   * Deletes a specific food log by its unique id
+   */
+  public static async deleteFoodLog(id: string): Promise<void> {
+    try {
+      const logs = await this.getFoodLogs();
+      const updated = logs.filter((item) => item.id !== id);
+      memoryFoodLogs = updated;
+
+      const jsonStr = JSON.stringify(updated);
+      try {
+        await AsyncStorage.setItem(FOOD_STORAGE_KEY, jsonStr);
+      } catch {}
+      if (typeof globalThis !== 'undefined' && (globalThis as any).localStorage) {
+        (globalThis as any).localStorage.setItem(FOOD_STORAGE_KEY, jsonStr);
+      }
+    } catch (e) {
+      console.warn('[StorageService] Error deleting food log:', e);
+    }
+  }
+
+  /**
+   * Clears all saved food intake logs
    */
   public static async clearFoodLogs(): Promise<void> {
     memoryFoodLogs = [];
     try {
       await AsyncStorage.removeItem(FOOD_STORAGE_KEY);
+      await AsyncStorage.setItem(FOOD_STORAGE_KEY, JSON.stringify([]));
     } catch {}
     try {
       if (typeof globalThis !== 'undefined' && (globalThis as any).localStorage) {
         (globalThis as any).localStorage.removeItem(FOOD_STORAGE_KEY);
+        (globalThis as any).localStorage.setItem(FOOD_STORAGE_KEY, JSON.stringify([]));
       }
     } catch (e) {
       console.warn('[StorageService] Error clearing food logs:', e);

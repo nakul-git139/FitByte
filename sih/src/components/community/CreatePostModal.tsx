@@ -17,13 +17,17 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import { CommunityService } from '../../services/communityService';
-import { CommunityPost } from '../../types/community';
+import { CommunityPost, PostProgressMetrics } from '../../types/community';
 import { Theme } from '../../config/theme';
+import { InteractiveProgressGraph } from './InteractiveProgressGraph';
 
 interface CreatePostModalProps {
   visible: boolean;
   onClose: () => void;
   onPostCreated: (newPost: CommunityPost) => void;
+  initialCaption?: string;
+  initialImageUri?: string;
+  initialProgressMetrics?: PostProgressMetrics;
 }
 
 const SAMPLE_PRESETS = [
@@ -48,17 +52,30 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
   visible,
   onClose,
   onPostCreated,
+  initialCaption,
+  initialImageUri,
+  initialProgressMetrics,
 }) => {
-  const [caption, setCaption] = useState<string>('');
-  const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
+  const [caption, setCaption] = useState<string>(initialCaption || '');
+  const [selectedImageUri, setSelectedImageUri] = useState<string | null>(initialImageUri || null);
+  const [progressMetrics, setProgressMetrics] = useState<PostProgressMetrics | null>(initialProgressMetrics || null);
   const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [submittingStep, setSubmittingStep] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  React.useEffect(() => {
+    if (visible) {
+      if (initialCaption) setCaption(initialCaption);
+      if (initialImageUri) setSelectedImageUri(initialImageUri);
+      if (initialProgressMetrics) setProgressMetrics(initialProgressMetrics);
+    }
+  }, [visible, initialCaption, initialImageUri, initialProgressMetrics]);
+
   const resetForm = () => {
     setCaption('');
     setSelectedImageUri(null);
+    setProgressMetrics(null);
     setImageBase64(null);
     setErrorMessage(null);
     setIsSubmitting(false);
@@ -89,6 +106,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const asset = result.assets[0];
         setSelectedImageUri(asset.uri);
+        setProgressMetrics(null);
         setImageBase64(asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : null);
       }
     } catch (err: any) {
@@ -163,6 +181,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
       const res = await CommunityService.createPost({
         caption: caption.trim(),
         imageUrl: finalImageUrl,
+        progressMetrics: progressMetrics || undefined,
       });
 
       if (res.success && res.post) {
@@ -230,45 +249,64 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
             </View>
           )}
 
-          {/* Image Picker / Preview Section */}
-          <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Workout Photo</Text>
-
-            {selectedImageUri ? (
-              <View style={styles.imagePreviewContainer}>
-                <Image source={{ uri: selectedImageUri }} style={styles.imagePreview} resizeMode="cover" />
-                <TouchableOpacity style={styles.removeImageBtn} onPress={handleRemoveImage}>
-                  <Ionicons name="close-circle" size={26} color="#FFFFFF" />
+          {/* Interactive Progress Graph or Image Picker Section */}
+          {progressMetrics ? (
+            <View style={styles.section}>
+              <View style={styles.metricsPreviewHeader}>
+                <Text style={styles.sectionLabel}>Interactive Progress Graph</Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    setProgressMetrics(null);
+                    setSelectedImageUri(null);
+                  }}
+                  style={styles.removeGraphBtn}
+                >
+                  <Text style={styles.removeGraphText}>Switch to Photo</Text>
                 </TouchableOpacity>
               </View>
-            ) : (
-              <View style={styles.pickerBox}>
-                <TouchableOpacity style={styles.uploadTrigger} onPress={handlePickFromGallery}>
-                  <View style={styles.uploadIconCircle}>
-                    <Ionicons name="camera-outline" size={28} color={Theme.colors.primaryGreen} />
-                  </View>
-                  <Text style={styles.uploadTitle}>Upload Workout Photo</Text>
-                  <Text style={styles.uploadSubtitle}>Choose from photo library</Text>
-                </TouchableOpacity>
 
-                {/* Preset Chips */}
-                <View style={styles.presetSection}>
-                  <Text style={styles.presetHeading}>Or pick a workout preset:</Text>
-                  <View style={styles.presetRow}>
-                    {SAMPLE_PRESETS.map((preset, idx) => (
-                      <TouchableOpacity
-                        key={idx}
-                        style={styles.presetChip}
-                        onPress={() => handleSelectPreset(preset)}
-                      >
-                        <Text style={styles.presetChipText}>{preset.label}</Text>
-                      </TouchableOpacity>
-                    ))}
+              <InteractiveProgressGraph metrics={progressMetrics} compact />
+            </View>
+          ) : (
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>Workout Photo</Text>
+
+              {selectedImageUri ? (
+                <View style={styles.imagePreviewContainer}>
+                  <Image source={{ uri: selectedImageUri }} style={styles.imagePreview} resizeMode="cover" />
+                  <TouchableOpacity style={styles.removeImageBtn} onPress={handleRemoveImage}>
+                    <Ionicons name="close-circle" size={26} color="#FFFFFF" />
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <View style={styles.pickerBox}>
+                  <TouchableOpacity style={styles.uploadTrigger} onPress={handlePickFromGallery}>
+                    <View style={styles.uploadIconCircle}>
+                      <Ionicons name="camera-outline" size={28} color={Theme.colors.primaryGreen} />
+                    </View>
+                    <Text style={styles.uploadTitle}>Upload Workout Photo</Text>
+                    <Text style={styles.uploadSubtitle}>Choose from photo library</Text>
+                  </TouchableOpacity>
+
+                  {/* Preset Chips */}
+                  <View style={styles.presetSection}>
+                    <Text style={styles.presetHeading}>Or pick a workout preset:</Text>
+                    <View style={styles.presetRow}>
+                      {SAMPLE_PRESETS.map((preset, idx) => (
+                        <TouchableOpacity
+                          key={idx}
+                          style={styles.presetChip}
+                          onPress={() => handleSelectPreset(preset)}
+                        >
+                          <Text style={styles.presetChipText}>{preset.label}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
                   </View>
                 </View>
-              </View>
-            )}
-          </View>
+              )}
+            </View>
+          )}
 
           {/* Caption Input */}
           <View style={styles.section}>
@@ -411,6 +449,23 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: Theme.colors.textPrimary,
+  },
+  metricsPreviewHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: Theme.spacing.xs,
+  },
+  removeGraphBtn: {
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: Theme.borderRadius.sm,
+  },
+  removeGraphText: {
+    fontSize: 11,
+    color: '#00F0FF',
+    fontWeight: '600',
   },
   uploadSubtitle: {
     fontSize: 13,

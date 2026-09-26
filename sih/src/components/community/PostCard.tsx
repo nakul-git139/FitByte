@@ -16,6 +16,7 @@ import { User } from '../../types/auth';
 import { CommunityService } from '../../services/communityService';
 import { getBackendBaseUrl } from '../../config/apiConfig';
 import { Theme } from '../../config/theme';
+import { InteractiveProgressGraph } from './InteractiveProgressGraph';
 
 interface PostCardProps {
   post: CommunityPost;
@@ -229,8 +230,12 @@ export const PostCard: React.FC<PostCardProps> = ({
         )}
       </View>
 
-      {/* 2. Post Image */}
-      {fullImageUrl ? (
+      {/* 2. Interactive Progress Graph or Post Image */}
+      {post.progressMetrics ? (
+        <View style={styles.graphWrapper}>
+          <InteractiveProgressGraph metrics={post.progressMetrics} />
+        </View>
+      ) : fullImageUrl ? (
         <View style={styles.imageWrapper}>
           <Image
             source={{ uri: fullImageUrl }}
@@ -379,6 +384,10 @@ const styles = StyleSheet.create({
   menuButton: {
     padding: 6,
     borderRadius: Theme.borderRadius.sm,
+  },
+  graphWrapper: {
+    paddingHorizontal: Theme.spacing.base,
+    paddingTop: Theme.spacing.xs,
   },
   imageWrapper: {
     width: '100%',

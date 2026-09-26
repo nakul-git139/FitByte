@@ -260,6 +260,7 @@ export default function App() {
               <ProgressScreen
                 onOpenSettings={() => setActiveTab('profile')}
                 onSelectWorkout={handleQuickLaunchExercise}
+                onNavigateToCommunity={() => setActiveTab('community')}
               />
             )}
 

@@ -88,6 +88,7 @@ class CommunityStore {
    * Get paginated feed of posts sorted newest first
    */
   getPosts({ page = 1, limit = 20, currentUserId = null }) {
+    this.loadData();
     const pageNum = Math.max(1, parseInt(page, 10) || 1);
     const limitNum = Math.min(50, Math.max(1, parseInt(limit, 10) || 20));
 
@@ -131,7 +132,7 @@ class CommunityStore {
   /**
    * Create a new post
    */
-  createPost({ userId, userName, userAvatar = null, imageUrl = '', caption }) {
+  createPost({ userId, userName, userAvatar = null, imageUrl = '', caption, progressMetrics = null }) {
     if (!userId || !caption) {
       throw new Error('userId and caption are required');
     }
@@ -143,6 +144,7 @@ class CommunityStore {
       userAvatar: userAvatar || null,
       imageUrl: (imageUrl || '').trim(),
       caption: caption.trim(),
+      progressMetrics: progressMetrics || null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       likesCount: 0,

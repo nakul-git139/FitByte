@@ -1,269 +1,133 @@
 {
   "posts": [
     {
-      "id": "post_1789648871783_60138145",
-      "userId": "usr_1789648871706_bcc8fb8e",
-      "userName": "Alice Athlete 1789648871642",
-      "userAvatar": null,
-      "imageUrl": "/api/community/uploads/post_1789648871774_fc481220b196.png",
-      "caption": "Post to test reporting mechanism",
-      "createdAt": "2026-09-17T12:41:11.783Z",
-      "updatedAt": "2026-09-17T12:41:11.783Z",
-      "likesCount": 0,
-      "commentsCount": 0
+      "id": "post_feed_1",
+      "userId": "usr_maya_lin",
+      "userName": "Chef Maya Lin",
+      "userAvatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80",
+      "imageUrl": "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80",
+      "caption": "🥑 High-Protein Fuel: Grilled Salmon & Quinoa Superbowl (56g Protein, 580 kcal)! Scanned with FitPilot AI Macro Lens in 2 seconds. Proper post-workout protein intake = maximum muscle recovery! 🥗💪 #HighProtein #MealPrep #Nutrition",
+      "createdAt": "2026-09-26T21:30:00.000Z",
+      "updatedAt": "2026-09-26T21:30:00.000Z",
+      "likesCount": 45,
+      "commentsCount": 6
     },
     {
-      "id": "post_1789648520382_7c04941b",
-      "userId": "usr_1789648520300_69c2db78",
-      "userName": "Alice Athlete 1789648520229",
-      "userAvatar": null,
-      "imageUrl": "/api/community/uploads/post_1789648520368_2ee775a33581.png",
-      "caption": "Post to test reporting mechanism",
-      "createdAt": "2026-09-17T12:35:20.382Z",
-      "updatedAt": "2026-09-17T12:35:20.382Z",
-      "likesCount": 0,
-      "commentsCount": 0
+      "id": "post_feed_2",
+      "userId": "usr_elena_fit",
+      "userName": "Elena Rostova",
+      "userAvatar": "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=200&q=80",
+      "imageUrl": "https://images.unsplash.com/photo-1517838277536-f5f99be501cd?auto=format&fit=crop&w=800&q=80",
+      "caption": "✨ 1-Month Milestone: Started at 15 pushups, just hit 45 continuous reps with 96% AI form accuracy! The real-time angle audio coach keeps my back straight and elbows locked at 45°. Progress feels incredible! 📈🔥 #Transformation #FormFirst",
+      "progressMetrics": {
+        "type": "streak",
+        "streakDays": 12,
+        "workoutsCount": 18,
+        "totalReps": 45,
+        "caloriesBurned": 420,
+        "formAccuracy": 96,
+        "exerciseName": "Pushups",
+        "chartData": [
+          { "day": "Mon", "value": 30, "score": 92 },
+          { "day": "Tue", "value": 35, "score": 94 },
+          { "day": "Wed", "value": 38, "score": 95 },
+          { "day": "Thu", "value": 40, "score": 93 },
+          { "day": "Fri", "value": 45, "score": 96 },
+          { "day": "Sat", "value": 0, "score": 0 },
+          { "day": "Sun", "value": 0, "score": 0 }
+        ],
+        "weeklyActiveDays": [true, true, true, true, true, false, false]
+      },
+      "createdAt": "2026-09-26T20:15:00.000Z",
+      "updatedAt": "2026-09-26T20:15:00.000Z",
+      "likesCount": 52,
+      "commentsCount": 8
     },
     {
-      "id": "post_1789641193378_580cfb86",
-      "userId": "usr_1789023530588_c99bc24c",
-      "userName": "Nakul",
-      "userAvatar": "https://lh3.googleusercontent.com/a/default-user",
-      "imageUrl": "/api/community/uploads/post_1789641192227_1df63aee8720.jpg",
-      "caption": "Alien",
-      "createdAt": "2026-09-17T10:33:13.378Z",
-      "updatedAt": "2026-09-17T10:33:13.378Z",
-      "likesCount": 0,
-      "commentsCount": 0
+      "id": "post_feed_3",
+      "userId": "usr_david_chen",
+      "userName": "David Chen",
+      "userAvatar": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80",
+      "imageUrl": "https://images.unsplash.com/photo-1525351484163-7529414344d8?auto=format&fit=crop&w=800&q=80",
+      "caption": "🍳 Power Breakfast: 4 farm eggs, sourdough, smoked turkey breast, and avocado (48g protein, 520 kcal). Clean whole foods to fuel today's heavy squat PR! 🥑⚡ #HighProteinBreakfast #CleanEating #MuscleFuel",
+      "createdAt": "2026-09-26T18:45:00.000Z",
+      "updatedAt": "2026-09-26T18:45:00.000Z",
+      "likesCount": 38,
+      "commentsCount": 4
     },
     {
-      "id": "post_1789641162128_8ef2fa40",
-      "userId": "usr_1789023530588_c99bc24c",
-      "userName": "Nakul",
-      "userAvatar": "https://lh3.googleusercontent.com/a/default-user",
-      "imageUrl": "/api/community/uploads/post_1789641161163_1093c031687e.jpg",
-      "caption": "Gsushs",
-      "createdAt": "2026-09-17T10:32:42.128Z",
-      "updatedAt": "2026-09-17T10:32:42.128Z",
-      "likesCount": 0,
-      "commentsCount": 0
+      "id": "post_feed_4",
+      "userId": "usr_coach_marcus",
+      "userName": "Coach Marcus",
+      "userAvatar": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80",
+      "imageUrl": "https://images.unsplash.com/photo-1574680096145-d05b474e2155?auto=format&fit=crop&w=800&q=80",
+      "caption": "🔥 Huge shoutout to everyone crushing their daily workout streaks this week! Remember: consistency beats intensity every single day. Let's finish the week strong! 💪🎯 #FitPilot #Consistency",
+      "createdAt": "2026-09-26T16:20:00.000Z",
+      "updatedAt": "2026-09-26T16:20:00.000Z",
+      "likesCount": 61,
+      "commentsCount": 9
     },
     {
-      "id": "post_1789561911746_48400964",
-      "userId": "usr_1789561685532_7993df32",
+      "id": "post_feed_5",
+      "userId": "usr_sarah_j",
+      "userName": "Sarah Jenkins",
+      "userAvatar": "https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=200&q=80",
+      "imageUrl": "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?auto=format&fit=crop&w=800&q=80",
+      "caption": "Hit a 3-minute continuous plank milestone with zero hip sag! 🎯 Spine alignment tracked green across the whole session. Next up: 4 minutes! 🔥🧘‍♀️ #CoreStrength #Milestone",
+      "createdAt": "2026-09-26T14:10:00.000Z",
+      "updatedAt": "2026-09-26T14:10:00.000Z",
+      "likesCount": 44,
+      "commentsCount": 5
+    },
+    {
+      "id": "post_feed_6",
+      "userId": "usr_alex_rivera",
       "userName": "Alex Rivera",
-      "userAvatar": "https://lh3.googleusercontent.com/a/default-user",
-      "imageUrl": "/api/community/uploads/post_1789561910888_40c4b1630337.jpg",
-      "caption": "Nigga for sale",
-      "createdAt": "2026-09-16T12:31:51.746Z",
-      "updatedAt": "2026-09-16T14:12:59.598Z",
-      "likesCount": 2,
-      "commentsCount": 1
-    },
-    {
-      "id": "post_1789561623268_7d41e1f1",
-      "userId": "usr_1789561623258_0284b0a8",
-      "userName": "Runner Athlete",
-      "userAvatar": null,
-      "imageUrl": "",
-      "caption": "Just completed 5k run in 22 minutes! Great progress this month 🏃💨",
-      "createdAt": "2026-09-16T12:27:03.268Z",
-      "updatedAt": "2026-09-16T12:27:03.268Z",
-      "likesCount": 0,
-      "commentsCount": 0
-    },
-    {
-      "id": "post_1789561623267_446f1e96",
-      "userId": "usr_1789561623258_0284b0a8",
-      "userName": "Runner Athlete",
-      "userAvatar": null,
-      "imageUrl": "/api/community/uploads/post_1789561623267_41c95f213d6e.jpg",
-      "caption": "Morning calisthenics flow completed! ⚡🏃",
-      "createdAt": "2026-09-16T12:27:03.267Z",
-      "updatedAt": "2026-09-16T12:27:03.267Z",
-      "likesCount": 0,
-      "commentsCount": 0
-    },
-    {
-      "id": "post_1789561623266_2e0da8d5",
-      "userId": "usr_1789561623258_0284b0a8",
-      "userName": "Runner Athlete",
-      "userAvatar": null,
-      "imageUrl": "/api/community/uploads/post_1789561623263_127e61a507fe.png",
-      "caption": "Crushed 50 pushups with perfect form! 💪🔥 #Milestone",
-      "createdAt": "2026-09-16T12:27:03.266Z",
-      "updatedAt": "2026-09-16T12:27:03.266Z",
-      "likesCount": 0,
-      "commentsCount": 0
-    },
-    {
-      "id": "post_1789560006773_a0888ba5",
-      "userId": "usr_1789560006762_0aef6bbb",
-      "userName": "Runner Athlete",
-      "userAvatar": null,
-      "imageUrl": "",
-      "caption": "Just completed 5k run in 22 minutes! Great progress this month 🏃💨",
-      "createdAt": "2026-09-16T12:00:06.773Z",
-      "updatedAt": "2026-09-16T12:00:06.773Z",
-      "likesCount": 0,
-      "commentsCount": 0
-    },
-    {
-      "id": "post_1789560006772_a1158e0c",
-      "userId": "usr_1789560006762_0aef6bbb",
-      "userName": "Runner Athlete",
-      "userAvatar": null,
-      "imageUrl": "/api/community/uploads/post_1789560006772_560fd97ae243.jpg",
-      "caption": "Morning calisthenics flow completed! ⚡🏃",
-      "createdAt": "2026-09-16T12:00:06.772Z",
-      "updatedAt": "2026-09-16T12:00:06.772Z",
-      "likesCount": 0,
-      "commentsCount": 0
-    },
-    {
-      "id": "post_1789560006770_b9967269",
-      "userId": "usr_1789560006762_0aef6bbb",
-      "userName": "Runner Athlete",
-      "userAvatar": null,
-      "imageUrl": "/api/community/uploads/post_1789560006767_d6d9f715fd22.png",
-      "caption": "Crushed 50 pushups with perfect form! 💪🔥 #Milestone",
-      "createdAt": "2026-09-16T12:00:06.770Z",
-      "updatedAt": "2026-09-16T12:00:06.770Z",
-      "likesCount": 0,
-      "commentsCount": 0
-    },
-    {
-      "id": "post_1789559123807_8f88b96a",
-      "userId": "usr_1789559123737_b4532678",
-      "userName": "Security Alice 1789559123657",
-      "userAvatar": null,
-      "imageUrl": "/api/community/uploads/post_1789559123805_65777e527eb9.png",
-      "caption": "Great workout! alert(\"xss\") Bold Progress #FitPilot",
-      "createdAt": "2026-09-16T11:45:23.807Z",
-      "updatedAt": "2026-09-16T11:45:23.815Z",
-      "likesCount": 1,
-      "commentsCount": 1
-    },
-    {
-      "id": "post_1789558878059_448936d7",
-      "userId": "usr_1789558877983_8c78c81a",
-      "userName": "Alice Athlete 1789558877919",
-      "userAvatar": null,
-      "imageUrl": "/api/community/uploads/post_1789558878049_b889a67bb1a2.png",
-      "caption": "Post to test reporting mechanism",
-      "createdAt": "2026-09-16T11:41:18.059Z",
-      "updatedAt": "2026-09-16T11:41:18.059Z",
-      "likesCount": 0,
-      "commentsCount": 0
-    },
-    {
-      "id": "post_1789558594943_06376e07",
-      "userId": "usr_1789558594868_e3db379b",
-      "userName": "Alice Athlete 1789558594804",
-      "userAvatar": null,
-      "imageUrl": "/api/community/uploads/post_1789558594935_ef8e2f6cfb7c.png",
-      "caption": "Post to test reporting mechanism",
-      "createdAt": "2026-09-16T11:36:34.944Z",
-      "updatedAt": "2026-09-16T11:36:34.944Z",
-      "likesCount": 0,
-      "commentsCount": 0
-    },
-    {
-      "id": "post_1789558236036_0aad93fb",
-      "userId": "usr_1789558235955_4fe812cc",
-      "userName": "Alice Athlete 1789558235885",
-      "userAvatar": null,
-      "imageUrl": "/api/community/uploads/post_1789558236024_6355c61aa3fe.png",
-      "caption": "Post to test reporting mechanism",
-      "createdAt": "2026-09-16T11:30:36.036Z",
-      "updatedAt": "2026-09-16T11:30:36.036Z",
-      "likesCount": 0,
-      "commentsCount": 0
+      "userAvatar": "https://images.unsplash.com/photo-1583454110551-21f2fa2afe61?auto=format&fit=crop&w=200&q=80",
+      "imageUrl": "https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?auto=format&fit=crop&w=800&q=80",
+      "caption": "Morning kettlebell & squat circuit locked in. 30 deep squats at 94% depth accuracy. Felt smooth from rep 1 to 30. 🏋️‍♂️⚡ #MorningGrind #SquatsPR",
+      "createdAt": "2026-09-26T11:00:00.000Z",
+      "updatedAt": "2026-09-26T11:00:00.000Z",
+      "likesCount": 33,
+      "commentsCount": 3
     }
   ],
   "likes": [
     {
-      "id": "like_1789559123815_aecd2836",
-      "postId": "post_1789559123807_8f88b96a",
-      "userId": "usr_1789559123802_01db7569",
-      "createdAt": "2026-09-16T11:45:23.815Z"
+      "id": "like_seed_1",
+      "postId": "post_feed_1",
+      "userId": "usr_david_chen",
+      "createdAt": "2026-09-26T21:35:00.000Z"
     },
     {
-      "id": "like_1789561923736_ddb7d888",
-      "postId": "post_1789561911746_48400964",
-      "userId": "usr_1789561685532_7993df32",
-      "createdAt": "2026-09-16T12:32:03.736Z"
-    },
-    {
-      "id": "like_1789567950822_66c543c6",
-      "postId": "post_1789561911746_48400964",
-      "userId": "usr_1789023530588_c99bc24c",
-      "createdAt": "2026-09-16T14:12:30.822Z"
+      "id": "like_seed_2",
+      "postId": "post_feed_2",
+      "userId": "usr_coach_marcus",
+      "createdAt": "2026-09-26T20:20:00.000Z"
     }
   ],
   "comments": [
     {
-      "id": "cmt_1789559123808_d061d20e",
-      "postId": "post_1789559123807_8f88b96a",
-      "userId": "usr_1789559123802_01db7569",
-      "userName": "Security Bob 1789559123657",
-      "userAvatar": null,
-      "text": "Awesome!  Keep it up!",
-      "createdAt": "2026-09-16T11:45:23.808Z",
-      "updatedAt": "2026-09-16T11:45:23.808Z"
+      "id": "cmt_seed_1",
+      "postId": "post_feed_1",
+      "userId": "usr_coach_marcus",
+      "userName": "Coach Marcus",
+      "userAvatar": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80",
+      "text": "56g protein in one clean bowl is top tier recovery food! Looks delicious Maya! 🥗🔥",
+      "createdAt": "2026-09-26T21:40:00.000Z",
+      "updatedAt": "2026-09-26T21:40:00.000Z"
     },
     {
-      "id": "cmt_1789567979598_a58066dc",
-      "postId": "post_1789561911746_48400964",
-      "userId": "usr_1789023530588_c99bc24c",
-      "userName": "Nakul",
-      "userAvatar": "https://lh3.googleusercontent.com/a/default-user",
-      "text": "How much ?",
-      "createdAt": "2026-09-16T14:12:59.598Z",
-      "updatedAt": "2026-09-16T14:12:59.598Z"
+      "id": "cmt_seed_2",
+      "postId": "post_feed_2",
+      "userId": "usr_maya_lin",
+      "userName": "Chef Maya Lin",
+      "userAvatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80",
+      "text": "96% form accuracy is incredible! Keep crushing those reps Elena! 💪✨",
+      "createdAt": "2026-09-26T20:25:00.000Z",
+      "updatedAt": "2026-09-26T20:25:00.000Z"
     }
   ],
-  "reports": [
-    {
-      "id": "rep_1789558236036_20879b68",
-      "userId": "usr_1789558236021_21ddfeaf",
-      "postId": "post_1789558236036_0aad93fb",
-      "commentId": null,
-      "reason": "Inappropriate content testing reason",
-      "createdAt": "2026-09-16T11:30:36.036Z"
-    },
-    {
-      "id": "rep_1789558594944_20c5fa22",
-      "userId": "usr_1789558594934_b8a0ff3a",
-      "postId": "post_1789558594943_06376e07",
-      "commentId": null,
-      "reason": "Inappropriate content testing reason",
-      "createdAt": "2026-09-16T11:36:34.944Z"
-    },
-    {
-      "id": "rep_1789558878060_f9f3c3c3",
-      "userId": "usr_1789558878047_cc604a83",
-      "postId": "post_1789558878059_448936d7",
-      "commentId": null,
-      "reason": "Inappropriate content testing reason",
-      "createdAt": "2026-09-16T11:41:18.060Z"
-    },
-    {
-      "id": "rep_1789648520383_8856f252",
-      "userId": "usr_1789648520366_1e3b1eee",
-      "postId": "post_1789648520382_7c04941b",
-      "commentId": null,
-      "reason": "Inappropriate content testing reason",
-      "createdAt": "2026-09-17T12:35:20.383Z"
-    },
-    {
-      "id": "rep_1789648871784_04402e3e",
-      "userId": "usr_1789648871773_eaa15220",
-      "postId": "post_1789648871783_60138145",
-      "commentId": null,
-      "reason": "Inappropriate content testing reason",
-      "createdAt": "2026-09-17T12:41:11.784Z"
-    }
-  ],
-  "updatedAt": "2026-09-17T12:41:11.784Z"
+  "reports": [],
+  "updatedAt": "2026-09-26T22:35:00.000Z"
 }

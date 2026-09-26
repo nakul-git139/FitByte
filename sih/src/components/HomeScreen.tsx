@@ -7,6 +7,7 @@ import {
   ScrollView,
   Image,
   ImageBackground,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -47,6 +48,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   });
   const [nutritionSummary, setNutritionSummary] = useState<DailyNutritionSummary | null>(null);
 
+  const loadNutrition = async () => {
+    try {
+      const data = await StorageService.getDailyNutritionSummary();
+      setNutritionSummary(data);
+    } catch (e) {
+      console.warn('[HomeScreen] Error loading nutrition summary:', e);
+    }
+  };
+
   useEffect(() => {
     StorageService.getDashboardStats()
       .then((data) => {
@@ -54,12 +64,29 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       })
       .catch((e) => console.warn('[HomeScreen] Error loading stats:', e));
 
-    StorageService.getDailyNutritionSummary()
-      .then((data) => {
-        setNutritionSummary(data);
-      })
-      .catch((e) => console.warn('[HomeScreen] Error loading nutrition summary:', e));
+    loadNutrition();
   }, []);
+
+  const handleClearFoodLogs = () => {
+    Alert.alert(
+      'Clear Food History',
+      'Are you sure you want to delete all logged meals and reset today\'s calories?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete All',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            } catch {}
+            await StorageService.clearFoodLogs();
+            await loadNutrition();
+          },
+        },
+      ]
+    );
+  };
 
   const handleStartWorkout = () => {
     try {
@@ -200,6 +227,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   Snap a photo of your food for instant calories, macros & AI coaching suggestions.
                 </Text>
               </View>
+              {nutritionSummary && nutritionSummary.totalCaloriesConsumed > 0 && (
+                <TouchableOpacity
+                  onPress={handleClearFoodLogs}
+                  style={styles.clearFoodButton}
+                  activeOpacity={0.7}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <Ionicons name="trash-outline" size={18} color={Theme.colors.error || '#EF4444'} />
+                </TouchableOpacity>
+              )}
             </View>
 
             {nutritionSummary && nutritionSummary.totalCaloriesConsumed > 0 && (
@@ -522,6 +559,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     marginBottom: Theme.spacing.md,
+  },
+  clearFoodButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#FEE2E2',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 4,
   },
   nutritionIconCircle: {
     width: 40,

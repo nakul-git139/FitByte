@@ -110,7 +110,7 @@ class CommunityController {
       const user = getAuthenticatedUser(req, true);
       checkRateLimit(user.id, 'create_post', 10, 60000);
 
-      const { caption, imageUrl, imageBase64 } = body;
+      const { caption, imageUrl, imageBase64, progressMetrics } = body;
 
       let finalImageUrl = imageUrl || '';
 
@@ -134,12 +134,22 @@ class CommunityController {
         return sendJson(res, 400, { error: 'Caption cannot exceed 2,000 characters' });
       }
 
+      const authorName =
+        (body.userName && body.userName.trim()) ||
+        (user && user.name && user.name !== 'FitPilot Athlete' ? user.name : null) ||
+        (user && user.email ? user.email.split('@')[0] : null) ||
+        'FitPilot Athlete';
+
+      const authorAvatar = (body.userAvatar && body.userAvatar.trim()) || (user ? user.avatarUrl : null) || null;
+      const authorId = (user && user.id) || body.userId || `usr_${Date.now()}`;
+
       const post = communityStore.createPost({
-        userId: user.id,
-        userName: user.name || 'FitPilot Athlete',
-        userAvatar: user.avatarUrl || null,
+        userId: authorId,
+        userName: authorName,
+        userAvatar: authorAvatar,
         imageUrl: typeof finalImageUrl === 'string' ? finalImageUrl.trim() : '',
         caption: cleanCaption,
+        progressMetrics: progressMetrics || null,
       });
 
       // Broadcast WebSocket event to all connected athletes
